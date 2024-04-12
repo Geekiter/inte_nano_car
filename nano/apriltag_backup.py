@@ -40,7 +40,7 @@ g_x = 0
 g_y = 0
 g_z = 0
 
-color = 'orange'
+color = 'red'
 tag_id = 3
 mode = ""
 connected = False
