@@ -20,11 +20,10 @@ class Nano:
         serial_port = '/dev/ttyTHS1'
         baud_rate = 115200  # 波特率
         self.uart = SerialPort(serial_port, baud_rate)
-        fx = 396.943
-        fy = 391.173
-        cx = 159.771
-        cy = 98.5957
-        camera_params = [fx, fy, cx, cy]  # 相机焦距和主点
+
+        self.camera_params = np.array(
+            [[1.43172312e+03, 0.00000000e+00, 6.07848210e+02], [0.00000000e+00, 1.43099923e+03, 3.28374663e+02],
+             [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
 
         self.camera = cv2.VideoCapture(0, cv2.CAP_V4L2)
         # 设置摄像头参数
@@ -64,6 +63,7 @@ class Nano:
     def find_apriltags(self, img):
         detector = apriltag.Detector()
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
         return detector.detect(gray)
 
     def find_approx_red_squares(self, img):
@@ -110,11 +110,80 @@ class Nano:
                 cx = x + w / 2
                 cy = y + h / 2
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 1)
-                zf_w = real_dis * w
-                zf_h = real_dis * h
-                cv2.putText(img, f"zf_w: {zf_w:.2f}", (x + w + 10, y + h + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                            (0, 255, 0), 1)
-                cv2.putText(img, f"zf_h: {zf_h:.2f}", (x + w + 10, y + h + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                width = w
+                height = h
+                diag = np.sqrt(width ** 2 + height ** 2)
+                dis = self.calculate_distance_to_tag(diag)
+                zf = real_dis / dis
+                cv2.putText(img, f"zf: {zf:.2f}", (x + w + 10, y + h + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0),
+                            1)
+
+            else:
+                print("no red object")
+            cv2.imshow('USB Camera', img)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        self.camera.release()
+        cv2.destroyAllWindows()
+
+    def cal_zf_from_tag(self, real_dis=13.6):
+        while True:
+            ret, img = self.camera.read()
+            apriltags = self.find_apriltags(img)
+            for tag in apriltags:
+                cv2.rectangle(img, (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int)),
+                              (tag.corners[2][0].astype(int), tag.corners[2][1].astype(int)), (0, 255, 0), 1)
+
+                width = tag.corners[2][0] - tag.corners[0][0]
+                height = tag.corners[2][1] - tag.corners[0][1]
+                diag = np.sqrt(width ** 2 + height ** 2)
+                dis = self.calculate_distance_to_tag(diag)
+                zf = - real_dis / dis
+                cv2.putText(img, f"zf: {zf:.2f}", (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int) - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+            cv2.imshow('USB Camera', img)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        self.camera.release()
+        cv2.destroyAllWindows()
+
+    def get_tag_dis_by_zf(self, zf):
+        while True:
+            ret, img = self.camera.read()
+            apriltags = self.find_apriltags(img)
+            for tag in apriltags:
+                cv2.rectangle(img, (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int)),
+                              (tag.corners[2][0].astype(int), tag.corners[2][1].astype(int)), (0, 255, 0), 1)
+
+                width = tag.corners[2][0] - tag.corners[0][0]
+                height = tag.corners[2][1] - tag.corners[0][1]
+                diag = np.sqrt(width ** 2 + height ** 2)
+                dis = self.calculate_distance_to_tag(diag)
+                real_dis = - zf * - dis
+                cv2.putText(img, f"real_dis: {real_dis:.2f}",
+                            (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int) - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+            cv2.imshow('USB Camera', img)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        self.camera.release()
+        cv2.destroyAllWindows()
+
+    def get_color_dis_by_zf(self, zf):
+        while True:
+            ret, img = self.camera.read()
+            rect = self.find_approx_red_squares(img)
+            if rect is not None:
+                x, y, w, h = rect
+                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 1)
+                width = w
+                height = h
+                diag = np.sqrt(width ** 2 + height ** 2)
+                dis = self.calculate_distance_to_tag(diag)
+                real_dis = zf * dis
+                cv2.putText(img, f"real_dis: {real_dis:.2f}", (x + w + 10, y + h + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                             (0, 255, 0), 1)
 
             else:
@@ -125,48 +194,75 @@ class Nano:
         self.camera.release()
         cv2.destroyAllWindows()
 
+    # 计算相机到tag的距离
+    def calculate_distance_to_tag(self, tag_width_pixel):
+        focal_length = self.camera_params[0][0]
+        distance = focal_length / tag_width_pixel
+        return distance
+
     def run(self):
+        img_mode = "find_apriltags"
+        find_tag_id = 20
         while True:
             uart_send_data = {}
             uart_send_data["TagStatus"] = "none"
             uart_send_data["ObjectStatus"] = "none"
 
             pico_data = self.get_pico_data()
-            print("pico_data: ", pico_data)
-            # img_mode = pico_data.get("img_mode", "find_blobs")
-            img_mode = "find_blobs"
-            find_target_id = pico_data.get("find_target_id", None)
+            if pico_data != {}:
+                print(pico_data)
+            if pico_data.get("img_mode", None) is not None:
+                img_mode = pico_data.get("img_mode", None)
+
+            uart_send_data["img_mode"] = img_mode
 
             ret, img = self.camera.read()
-            # img = cv2.resize(img, (img.shape[1] // 4, img.shape[0] // 4))
 
             if not ret:
                 print("Can't receive frame (stream end?). Exiting ...")
                 continue
 
             if img_mode == "find_apriltags":
+                if pico_data.get("find_tag_id", None) is not None:
+                    find_tag_id = pico_data.get("find_tag_id", None)
+                    uart_send_data["find_tag_id"] = find_tag_id
                 apriltags = self.find_apriltags(img)  # defaults to TAG36H11
                 for tag in apriltags:
-                    # if tag.id() != find_target_id:
-                    #     continue
-
-                    cv2.rectangle(img, (tag.corners[0][0], tag.corners[0][1]), (tag.corners[2][0], tag.corners[2][1]),
-                                  (0, 255, 0), 2)
-
+                    if tag.tag_id != find_tag_id:
+                        continue
+                    cv2.rectangle(img, (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int)),
+                                  (tag.corners[2][0].astype(int), tag.corners[2][1].astype(int)), (0, 255, 0), 1)
+                    cv2.putText(img, f"ID: {tag.tag_id}",
+                                (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                     uart_send_data["TagStatus"] = "get"
                     uart_send_data["TagId"] = tag.tag_id
-                    uart_send_data["TagTz"] = tag.z()
-                    uart_send_data["TagCx"] = tag.cx()
-                    uart_send_data["TagCy"] = tag.cy()
+                    cx = tag.center[0]
+                    cy = tag.center[1]
+                    width = tag.corners[2][0] - tag.corners[0][0]
+                    height = tag.corners[2][1] - tag.corners[0][1]
+                    diag = np.sqrt(width ** 2 + height ** 2)
+                    dis = self.calculate_distance_to_tag(diag)
+
+                    uart_send_data["TagCx"] = cx
+                    uart_send_data["TagCy"] = cy
+                    uart_send_data["TagWidth"] = width
+                    uart_send_data["TagHeight"] = height
+                    uart_send_data["TagTz"] = - dis
             elif img_mode == "find_blobs":
                 rect = self.find_approx_red_squares(img)
                 if rect is not None:
                     cv2.rectangle(img, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), (0, 255, 0), 2)
                     cx = rect[0] + rect[2] / 2
                     cy = rect[1] + rect[3] / 2
+                    width = rect[2]
+                    height = rect[3]
+                    diag = np.sqrt(width ** 2 + height ** 2)
+                    dis = self.calculate_distance_to_tag(diag)
+                    uart_send_data["ObjectZ"] = dis
                     uart_send_data["ObjectStatus"] = "get"
-                    uart_send_data["ObjectCx"] = cx
-                    uart_send_data["ObjectCy"] = cy
+                    uart_send_data["ObjectX"] = cx
+                    uart_send_data["ObjectY"] = cy
                     uart_send_data["ObjectWidth"] = rect[2]
                     uart_send_data["ObjectHeight"] = rect[3]
             uart_send_data['ImageWidth'] = img.shape[1]
