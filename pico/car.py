@@ -10,9 +10,12 @@ class Car:
 
         self.target_index = 0
 
+        # claw
         self.inb1 = Pin(10, Pin.OUT)
         self.inb2 = Pin(9, Pin.OUT)
         self.pwmb = PWM(Pin(11))
+        self.pwmb.freq(1000)
+
         self.uart2 = UART(0, baudrate=115200, tx=Pin(16), rx=Pin(17))
 
         self.m = MotorDriver()
@@ -21,7 +24,6 @@ class Car:
         self.ina2 = Pin(7, Pin.OUT)
         self.pwma = PWM(Pin(6))
         self.pwma.freq(1000)
-        self.duty_16 = None
 
         # ## grab claw
         self.maxGrabLevel = 70
@@ -33,14 +35,14 @@ class Car:
     def RotateBCCW(self, duty):
         self.inb1.value(0)
         self.inb2.value(1)
-        self.duty_16 = int((duty * 65536) / 100)
-        self.pwmb.duty_u16(self.duty_16)
+        duty_16 = int((duty * 65536) / 100)
+        self.pwmb.duty_u16(duty_16)
 
     def RotateBCW(self, duty):
         self.inb1.value(1)
         self.inb2.value(0)
-        self.duty_16 = int((duty * 65536) / 100)
-        self.pwmb.duty_u16(self.duty_16)
+        duty_16 = int((duty * 65536) / 100)
+        self.pwmb.duty_u16(duty_16)
 
     def RotateACW(self, duty):
         self.ina1.value(1)
@@ -177,29 +179,29 @@ class Car:
         # for _ in range(5):
         #     self.armUp(30)
 
+        for _ in range(6):
+            self.closeClaw()
+        for _ in range(6):
+            self.openClaw()
+        for _ in range(6):
+            self.closeClaw()
+
         # for _ in range(6):
-        #     self.closeClaw()
+        #     print("right")
+        #     self.keepTurnRight(50)
+        #     sleep(0.5)
+        #
         # for _ in range(6):
-        #     self.openClaw()
+        #     print("left")
+        #     self.keepTurnLeft(50)
+        #     sleep(0.5)
+        #
         # for _ in range(6):
-        #     self.closeClaw()
-
-        for _ in range(6):
-            print("right")
-            self.keepTurnRight(50)
-            sleep(0.5)
-
-        for _ in range(6):
-            print("left")
-            self.keepTurnLeft(50)
-            sleep(0.5)
-
-        for _ in range(6):
-            print("forward")
-            self.keepForward(50)
-            sleep(0.5)
-
-        for _ in range(6):
-            print("backward")
-            self.keepBackward(50)
-            sleep(0.5)
+        #     print("forward")
+        #     self.keepForward(50)
+        #     sleep(0.5)
+        #
+        # for _ in range(6):
+        #     print("backward")
+        #     self.keepBackward(50)
+        #     sleep(0.5)
