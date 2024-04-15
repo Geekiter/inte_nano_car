@@ -200,7 +200,7 @@ class Nano:
         distance = focal_length / tag_width_pixel
         return distance
 
-    def run(self):
+    def run(self, manual_mode=None, manual_tag_id=None):
         img_mode = "find_apriltags"
         find_tag_id = 20
         while True:
@@ -216,6 +216,9 @@ class Nano:
 
             uart_send_data["img_mode"] = img_mode
 
+            if manual_mode is not None:
+                img_mode = manual_mode
+
             ret, img = self.camera.read()
 
             if not ret:
@@ -226,6 +229,8 @@ class Nano:
                 if pico_data.get("find_tag_id", None) is not None:
                     find_tag_id = pico_data.get("find_tag_id", None)
                     uart_send_data["find_tag_id"] = find_tag_id
+                if manual_tag_id is not None:
+                    find_tag_id = manual_tag_id
                 apriltags = self.find_apriltags(img)  # defaults to TAG36H11
                 for tag in apriltags:
                     if tag.tag_id != find_tag_id:

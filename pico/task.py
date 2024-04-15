@@ -259,30 +259,6 @@ class Task:
         self.target_index += 1
         self.discovered_obj = False
 
-    def get_nano_data(self):
-        self.uart.read_data()
-        json_byte = self.uart.frame_process()
-        if json_byte != -1 and json_byte != -2:
-            pico_data = json.loads(json_byte)
-            return pico_data
-        else:
-            return {}
-
-    def uart_test(self):
-        while True:
-            data = self.get_nano_data()
-
-            print(f"current data: {data}")
-            # uart_get = self.car.uart2.read()
-            # if uart_get:
-            #     print(uart_get)
-            # if not self.car.uart2.any():
-            #     continue
-            # data = self.get_json(self.car.uart2)
-            # print(f"current data: {data}")
-            uart_write_dict = {"img_mode": "find-apriltags"}
-            self.car.uart2.write(json.dumps(uart_write_dict))
-
     def car_init(self):
         for _ in range(10):
             self.car.armDown(self.arm_down_speed)
