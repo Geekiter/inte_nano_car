@@ -1,4 +1,6 @@
 .vscode
 .idea
-docs
+docs/material
 nano/pic
+nano/video_images
+*.pt

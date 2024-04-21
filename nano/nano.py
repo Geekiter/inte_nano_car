@@ -6,6 +6,8 @@ import threading
 import cv2
 import numpy as np
 
+from yolov5_obj import YOLOv5Detector
+
 if platform.system() == 'Windows':
     import pupil_apriltags as apriltag
 # linux导入apriltag库
@@ -51,6 +53,7 @@ class Nano:
         self.smoothed_rectangles = []
         self.smooth_factor = 0.5  # 平滑因子
         self.smooth_max = 10  # 最大平滑次数
+        self.detector = YOLOv5Detector(weights='yolov5_best.pt')
 
     def get_pico_data(self):
         json_byte = self.uart.frame_process()
@@ -270,6 +273,30 @@ class Nano:
                     uart_send_data["ObjectY"] = cy
                     uart_send_data["ObjectWidth"] = rect[2]
                     uart_send_data["ObjectHeight"] = rect[3]
+            elif img_mode == "kpu":
+                frame = cv2.resize(img, (320, 320))
+                # Predict on the current frame
+                predictions = self.detector.predict(frame)
+                for pred in predictions:
+                    x, y, w, h, conf, cls, label = pred
+                    if label != "duck" or conf < 0.5:
+                        continue
+                    # 恢复到原图尺寸
+                    x = int(x * 320)
+                    y = int(y * 240)
+                    w = int(w * 320)
+                    h = int(h * 240)
+
+                    cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
+                    cv2.putText(img, f"duck", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                    cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+                    uart_send_data["ObjectStatus"] = "get"
+                    uart_send_data["ObjectX"] = x
+                    uart_send_data["ObjectY"] = y
+                    uart_send_data["ObjectWidth"] = w
+                    uart_send_data["ObjectHeight"] = h
+
             uart_send_data['ImageWidth'] = img.shape[1]
             uart_send_data['ImageHeight'] = img.shape[0]
 
