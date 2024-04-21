@@ -55,6 +55,7 @@ rename the file to yolov5_best.pt
 > In nano
 
 ```shell
+pip3 install -r requirements.txt
 python3 main.py
 ```
 
