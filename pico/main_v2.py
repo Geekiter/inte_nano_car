@@ -1,5 +1,3 @@
-import asyncio
-
 from car import Car
 from task import Task
 
@@ -59,4 +57,3 @@ if __name__ == '__main__':
     # car.test()
     task = Task(car=car, target_action=target_action, **option_params)
     task.run()
-    # task.uart_test()

@@ -273,11 +273,11 @@ big_tag_id_list = [
 ]
 small_tag_id_list = [86, 88]
 
-small_tag_zoomfactor = 2.53
-big_tag_zoomfactor = 11.33
-kpu_tag_zf = 1.42
-duck_width_zoomfactor_qqvga = 829.6
-duck_height_zoomfactor_qqvga = 829.6
+small_tag_zoomfactor = 0.38
+big_tag_zoomfactor = 1.89
+kpu_tag_zf = 0.19
+duck_width_zoomfactor_qqvga = 897.6
+duck_height_zoomfactor_qqvga = 897.6
 
 
 target_img_mode = []
@@ -586,7 +586,7 @@ while is_finished is False and not test_mode:
         break
 
     data = get_json(uart2)
-
+    uart_write_dict = {}
     print(f"current data: {data}")
 
     k210_img_mode = data.get("img_mode", "N/A")
@@ -612,6 +612,9 @@ while is_finished is False and not test_mode:
 
     if k210_img_mode != target_img_mode[target_index]:
         uart_write_dict = {"img_mode": target_img_mode[target_index]}
+    if find_tag_id is None or find_tag_id != target_id_list[target_index]:
+        uart_write_dict = {"find_tag_id": target_id_list[target_index]}
+    if uart_write_dict != {}:
         uart2.write(json.dumps(uart_write_dict) + "\n")
 
     # if target_img_mode[target_index] == "find-apriltags" and find_tag_id != target_id_list[target_index]:
