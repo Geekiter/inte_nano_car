@@ -82,6 +82,8 @@ class Task:
     def close_to_obj_action(self, cx, cy, claw_range_level=1.5):
         print(f"cx: {cx}, cy: {cy}")
         print(f"k210_center: {self.k210_center}, k210_y_center: {self.k210_y_center}")
+        print("k210_y_center - arm_range: ", self.k210_y_center - self.arm_range)
+        print("k210_y_center + arm_range: ", self.k210_y_center + self.arm_range)
         print(f"arm_range: {self.arm_range}")
         if cy < self.k210_y_center - self.arm_range:
             print("view is low, arm up")
@@ -135,8 +137,8 @@ class Task:
             self.car.keepBackward(self.backward_speed)
 
     def put_down_action(self, tag_x, tag_y, tag_z):
-
-        if tag_z > 1.2 * (self.claw_close_len + self.arm_up_len):
+        print(f"distant is: {tag_z}")
+        if tag_z > self.claw_close_len + self.arm_up_len:
             self.close_to_obj_action(tag_x, tag_y)
         else:
             for _ in range(3):
@@ -175,10 +177,12 @@ class Task:
                 self.car.armUp(self.arm_up_speed)
 
     def grab_by_kpu(self, cx, cy, dis):
+        print(f"grab by kpu, distant is: {dis}")
         if dis > (self.rotate_in_front_of_obj + self.claw_open_len):
             self.close_to_obj_action(cx, cy, claw_range_level=1.5)
         else:
             if cy < self.k210_y_center:
+                print("grab by kpu, arm up")
                 self.car.armUp(self.arm_up_speed)
             else:
                 self.grab_mode = True
@@ -186,14 +190,14 @@ class Task:
     def grab_mode_in_kpu(self):
         for _ in range(1):
             self.car.keepBackward(self.backward_speed)
-        for _ in range(10):
+        for _ in range(5):
             self.car.armUp(self.arm_up_speed)
         for _ in range(self.grab_forward_count):
             self.car.keepForward(self.forward_speed)
-        for _ in range(12):
+        for _ in range(15):
             self.car.closeClaw()
 
-        for _ in range(6):
+        for _ in range(10):
             self.car.armUp(self.arm_up_speed)
 
         for _ in range(2 * (self.grab_forward_count - 1)):
@@ -210,10 +214,10 @@ class Task:
         #     armUp(25)
         for _ in range(self.grab_forward_count):
             self.car.keepForward(self.forward_speed)
-        for _ in range(12):
+        for _ in range(15):
             self.car.closeClaw()
 
-        for _ in range(6):
+        for _ in range(10):
             self.car.armUp(self.arm_up_speed)
 
         for _ in range(2 * (self.grab_forward_count - 1)):
@@ -313,7 +317,7 @@ class Task:
                 tag_id = int(data.get("TagId", "999"))
                 tag_status = data.get("TagStatus", "none")
                 zoomfactor = self.get_zf(tag_id)
-                tag_z = int(-zoomfactor * float(data.get("TagTz", "999")))
+                tag_z = int(zoomfactor * float(data.get("TagTz", "999")))
                 tag_cx = int(data.get("TagCx", "999"))
                 tag_cy = int(data.get("TagCy", "999"))
                 find_tag_id = data.get("find_tag_id", None)
@@ -349,6 +353,7 @@ class Task:
                 self.is_finished = True
                 break
             elif self.grab_mode and obj_status != "get":
+                print("grab mode, and obj status is: ", obj_status)
                 if self.target_action_list[self.target_index] in ["grab-by-kpu", "grab-by-kpu-apriltags"]:
                     self.grab_mode_in_kpu()
                 elif self.target_action_list[self.target_index] == "grab-by-color":
@@ -362,6 +367,7 @@ class Task:
                 sleep(2)
 
             elif self.grab_attempted:
+                print("grab attempted")
                 if data == {}:
                     continue
                 print("all count:{}, get count:{}".format(self.grab_attempted_all_count, self.grab_attempted_get_count))
@@ -387,6 +393,7 @@ class Task:
 
             elif (tag_status == "none" and obj_status == "none") or (
                     tag_status == "get" and tag_id != self.target_id_list[self.target_index]):
+                print("tag status is none, or tag id is not equal to target id")
                 if self.discovered_obj:
                     # discovered_obj_action()
                     print(f"wait ct={self.wait_ct}")

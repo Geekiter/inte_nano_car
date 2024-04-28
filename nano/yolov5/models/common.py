@@ -482,7 +482,8 @@ class DetectMultiBackend(nn.Module):
             weights = Path(w).with_suffix('.pdiparams')
             config = pdi.Config(str(w), str(weights))
             if cuda:
-                config.enable_use_gpu(memory_pool_init_size_mb=2048, device_id=0)
+                config.enable_use_gpu(memory_pool_init_size_mb=3964, device_id=0)
+                # config.enable_use_gpu(0, device_id=0)
             predictor = pdi.create_predictor(config)
             input_handle = predictor.get_input_handle(predictor.get_input_names()[0])
             output_names = predictor.get_output_names()

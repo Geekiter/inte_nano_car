@@ -1,9 +1,8 @@
 import json
 # windows导入pupil_apriltags库
 import platform
-import threading
+import queue
 
-import cv2
 import numpy as np
 
 from yolov5_obj import YOLOv5Detector
@@ -16,6 +15,109 @@ elif platform.system() == 'Linux':
 
 from parse_json import SerialPort
 
+import threading
+import cv2
+import subprocess
+
+
+def kill_all_video_processes():
+    # 使用lsof命令找出占用所有视频设备的进程
+    try:
+        # 查找所有/dev/video*设备的进程
+        result = subprocess.run(['lsof', '+D', '/dev/'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # 输出所有占用video设备的进程
+        if result.returncode == 0 and result.stdout:
+            lines = result.stdout.splitlines()
+            killed_pids = set()
+            for line in lines:
+                parts = line.split()
+                if 'video' in parts[8]:  # 检查设备名称是否包含'video'
+                    pid = parts[1]
+                    if pid not in killed_pids:  # 避免重复杀死同一进程
+                        try:
+                            # 尝试杀死进程
+                            subprocess.run(['kill', '-9', pid], check=True)
+                            killed_pids.add(pid)
+                            print(f"Process {pid} using {parts[8]} has been killed.")
+                        except subprocess.CalledProcessError:
+                            print(f"Failed to kill process {pid}.")
+        else:
+            print("No video device processes found.")
+    except Exception as e:
+        print(f"Error occurred: {e}")
+
+
+class CameraCapture:
+    def __init__(self, camera_index=0, max_frames=10):
+        self.max_frames = max_frames
+        self.cap = cv2.VideoCapture(-1, cv2.CAP_V4L)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        self.frame_queue = queue.Queue(maxsize=max_frames)
+        self.capture_thread = threading.Thread(target=self.capture_frames)
+        self.running = False
+        self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    def capture_frames(self):
+        while self.running:
+            ret, frame = self.cap.read()
+            if not ret:
+                # self.switch_camera()  # 如果读取失败，尝试切换摄像头
+                # continue
+                break
+            if not self.frame_queue.full():
+                self.frame_queue.put(frame)
+            while self.frame_queue.qsize() > 1:
+                self.frame_queue.get()
+
+    def start_capture(self):
+        self.running = True
+        self.capture_thread.start()
+
+    def get_latest_frame(self):
+        if not self.frame_queue.empty():
+            return self.frame_queue.get()
+        else:
+            self.switch_camera()  # 如果队列为空，尝试切换摄像头
+            return None
+
+    def stop_capture(self):
+        self.running = False
+        self.capture_thread.join()
+        self.cap.release()
+        cv2.destroyAllWindows()
+
+    def release(self):
+        self.cap.release()
+        cv2.destroyAllWindows()
+
+    def read(self):
+        return self.get_latest_frame()
+
+    def switch_camera(self):
+
+        self.cap.release()
+        kill_all_video_processes()
+        self.cap = cv2.VideoCapture(-1, cv2.CAP_V4L)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
+        # 测试是否切换成功
+        if self.cap.isOpened():
+            for i in range(10):
+                ret, frame = self.cap.read()
+                if ret:
+                    self.frame_queue.put(frame)
+            # 重启线程
+            self.capture_thread.join()
+            self.capture_thread = threading.Thread(target=self.capture_frames)
+            self.capture_thread.start()
+
+        else:
+            print(f"Failed to open camera")
+
+        print(f"Switched to camera index")
+
 
 class Nano:
     def __init__(self):
@@ -27,12 +129,9 @@ class Nano:
             [[1.43172312e+03, 0.00000000e+00, 6.07848210e+02], [0.00000000e+00, 1.43099923e+03, 3.28374663e+02],
              [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
 
-        self.camera = cv2.VideoCapture(0, cv2.CAP_V4L2)
-        # 设置摄像头参数
-        self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-        self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+        self.camera = CameraCapture(camera_index=0, max_frames=10)
+        self.camera.start_capture()
 
-        # start a thread that constantly reads data from the uart
         t1 = threading.Thread(target=self.uart.read_data)
         t1.setDaemon(True)
         t1.start()
@@ -53,7 +152,7 @@ class Nano:
         self.smoothed_rectangles = []
         self.smooth_factor = 0.5  # 平滑因子
         self.smooth_max = 10  # 最大平滑次数
-        self.detector = YOLOv5Detector(weights='yolov5_best.engine')
+        self.detector = None
 
     def get_pico_data(self):
         json_byte = self.uart.frame_process()
@@ -106,7 +205,7 @@ class Nano:
 
     def cal_zf_from_color(self, real_dis=13.6):
         while True:
-            ret, img = self.camera.read()
+            img = self.camera.read()
             rect = self.find_approx_red_squares(img)
             if rect is not None:
                 x, y, w, h = rect
@@ -131,7 +230,10 @@ class Nano:
 
     def cal_zf_from_tag(self, real_dis=13.6):
         while True:
-            ret, img = self.camera.read()
+            img = self.camera.read()
+            if img is None:
+                print("No frame in queue")
+                continue
             apriltags = self.find_apriltags(img)
             for tag in apriltags:
                 cv2.rectangle(img, (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int)),
@@ -153,7 +255,7 @@ class Nano:
 
     def get_tag_dis_by_zf(self, zf):
         while True:
-            ret, img = self.camera.read()
+            img = self.camera.read()
             apriltags = self.find_apriltags(img)
             for tag in apriltags:
                 cv2.rectangle(img, (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int)),
@@ -204,8 +306,10 @@ class Nano:
         return distance
 
     def run(self, manual_mode=None, manual_tag_id=None):
-        img_mode = "find_apriltags"
+        img_mode = "kpu"
         find_tag_id = 20
+        self.detector = YOLOv5Detector(weights='yolov5_best.engine')
+
         while True:
             uart_send_data = {}
             uart_send_data["TagStatus"] = "none"
@@ -222,10 +326,9 @@ class Nano:
             if manual_mode is not None:
                 img_mode = manual_mode
 
-            ret, img = self.camera.read()
-
-            if not ret:
-                print("Can't receive frame (stream end?). Exiting ...")
+            img = self.camera.read()
+            if img is None:
+                print("No frame in queue")
                 continue
 
             if img_mode == "find_apriltags":
@@ -256,7 +359,7 @@ class Nano:
                     uart_send_data["TagCy"] = cy
                     uart_send_data["TagWidth"] = width
                     uart_send_data["TagHeight"] = height
-                    uart_send_data["TagTz"] = - dis
+                    uart_send_data["TagTz"] = dis
             elif img_mode == "find_blobs":
                 rect = self.find_approx_red_squares(img)
                 if rect is not None:
@@ -271,19 +374,36 @@ class Nano:
                     uart_send_data["ObjectStatus"] = "get"
                     uart_send_data["ObjectX"] = cx
                     uart_send_data["ObjectY"] = cy
+                    uart_send_data["ObjectZ"] = dis
                     uart_send_data["ObjectWidth"] = rect[2]
                     uart_send_data["ObjectHeight"] = rect[3]
             elif img_mode == "kpu":
-                frame = cv2.resize(img, (640, 640))
-
+                # 高度变为640，宽度按比例缩放，然后居中裁剪成640*640
+                resize_w = img.shape[1] * 640 // img.shape[0]
+                frame = cv2.resize(img, (resize_w, 640))
+                frame = frame[:, (resize_w - 640) // 2:(resize_w + 640) // 2]
                 predictions = self.detector.predict(frame)
 
-                img = cv2.resize(frame, (320, 240))
+                img = cv2.resize(img, (320, 240))
 
+                x = 0
+                y = 0
+                w = 0
+                h = 0
+                conf = 0
                 for pred in predictions:
-                    x, y, w, h, conf, cls, label = pred
-                    if label != "class0" or conf < 0.45:
+                    tx, ty, tw, th, tconf, cls, label = pred
+                    if label != "class0":
                         continue
+                    if tconf > conf:
+                        conf = tconf
+                        x = tx
+                        y = ty
+                        w = tw
+                        h = th
+                if conf == 0:
+                    uart_send_data["ObjectStatus"] = "none"
+                else:
 
                     x = int(x * 320)
                     y = int(y * 240)
@@ -293,12 +413,14 @@ class Nano:
                     cv2.putText(img, f"duck", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                     cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
+                    diag = np.sqrt(w ** 2 + h ** 2)
+                    dis = self.calculate_distance_to_tag(diag)
                     uart_send_data["ObjectStatus"] = "get"
                     uart_send_data["ObjectX"] = x
                     uart_send_data["ObjectY"] = y
+                    uart_send_data["ObjectZ"] = dis
                     uart_send_data["ObjectWidth"] = w
                     uart_send_data["ObjectHeight"] = h
-                    break
 
             uart_send_data['ImageWidth'] = img.shape[1]
             uart_send_data['ImageHeight'] = img.shape[0]
@@ -307,10 +429,11 @@ class Nano:
 
             self.uart.port.write(uart_send_data_json.encode())  # 数据回传
 
+            img = cv2.resize(img, (320, 240))
             cv2.imshow('USB Camera', img)
             if cv2.waitKey(1) & 0xFF == ord('q'):  # 如果按下'q'键，则退出循环
                 break
 
         # 完成所有操作后，释放捕获器
-        self.camera.release()
+        # self.camera.release()
         cv2.destroyAllWindows()
