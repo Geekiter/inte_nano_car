@@ -16,7 +16,8 @@ class Task:
         self.small_tag_zoomfactor = kwargs.get('small_tag_zoomfactor', 2.53)
         self.big_tag_zoomfactor = kwargs.get('big_tag_zoomfactor', 11.33)
         self.kpu_tag_zf = kwargs.get('kpu_tag_zf', 1.42)
-        self.duck_width_zoom_factor = kwargs.get('duck_width_zoom_factor', 797.5)
+        self.kpu_obj_zoom_factor = kwargs.get('kpu_obj_zoom_factor', 797.5)
+        self.color_obj_zoom_factor = kwargs.get('color_obj_zoom_factor', 2.53)
         self.duck_height_zoom_factor = kwargs.get('duck_height_zoom_factor', 638)
 
         self.target_img_mode = []
@@ -217,10 +218,10 @@ class Task:
         for _ in range(15):
             self.car.closeClaw()
 
-        for _ in range(10):
+        for _ in range(12):
             self.car.armUp(self.arm_up_speed)
 
-        for _ in range(2 * (self.grab_forward_count - 1)):
+        for _ in range(2 * (self.grab_forward_count)):
             self.car.keepBackward(self.backward_speed)
 
         for _ in range(14):
@@ -234,7 +235,7 @@ class Task:
             self.grab_mode = True
             if cy > self.claw_arm_up_len:
                 self.car.armUp(self.arm_up_speed)
-                sleep(1)
+                sleep(0.5)
                 print("arm up, and h is: ", cy)
             else:
                 self.car.keepForward(25)
@@ -409,10 +410,10 @@ class Task:
                 if tag_id == self.target_id_list[self.target_index]:
                     self.put_down_action(tag_cx, tag_cy, tag_z)
             elif self.target_action_list[self.target_index] == "grab-by-kpu":
-                obj_dis = self.duck_width_zoom_factor * obj_z
+                obj_dis = self.kpu_obj_zoom_factor * obj_z
                 self.grab_by_kpu(obj_x, obj_y, obj_dis)
             elif self.target_action_list[self.target_index] == "grab-by-color":
-                obj_dis = self.duck_width_zoom_factor * obj_z
+                obj_dis = self.color_obj_zoom_factor * obj_z
                 self.grab_by_color(obj_x, obj_y, obj_dis)
             elif self.target_action_list[self.target_index] == "locate":
                 if tag_id == self.target_id_list[self.target_index]:
@@ -420,5 +421,5 @@ class Task:
             elif self.target_action_list[self.target_index] == "grab-by-kpu-apriltags":
                 self.get_kpu_tag_action(tag_cx, tag_cy, tag_z)
             elif self.target_action_list[self.target_index] == "locate-by-kpu":
-                obj_dis = self.duck_width_zoom_factor * obj_z
+                obj_dis = self.kpu_obj_zoom_factor * obj_z
                 self.kpu_locate_action(obj_x, obj_y, obj_dis)

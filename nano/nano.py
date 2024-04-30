@@ -2,6 +2,7 @@ import json
 # windows导入pupil_apriltags库
 import platform
 import queue
+import time
 
 import numpy as np
 
@@ -21,21 +22,17 @@ import subprocess
 
 
 def kill_all_video_processes():
-    # 使用lsof命令找出占用所有视频设备的进程
     try:
-        # 查找所有/dev/video*设备的进程
         result = subprocess.run(['lsof', '+D', '/dev/'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # 输出所有占用video设备的进程
         if result.returncode == 0 and result.stdout:
             lines = result.stdout.splitlines()
             killed_pids = set()
             for line in lines:
                 parts = line.split()
-                if 'video' in parts[8]:  # 检查设备名称是否包含'video'
+                if 'video' in parts[8]:
                     pid = parts[1]
-                    if pid not in killed_pids:  # 避免重复杀死同一进程
+                    if pid not in killed_pids:
                         try:
-                            # 尝试杀死进程
                             subprocess.run(['kill', '-9', pid], check=True)
                             killed_pids.add(pid)
                             print(f"Process {pid} using {parts[8]} has been killed.")
@@ -76,10 +73,15 @@ class CameraCapture:
         self.capture_thread.start()
 
     def get_latest_frame(self):
+        if self.frame_queue.empty():
+            for _ in range(self.max_frames):
+                ret, frame = self.cap.read()
+                if ret:
+                    self.frame_queue.put(frame)
         if not self.frame_queue.empty():
             return self.frame_queue.get()
         else:
-            self.switch_camera()  # 如果队列为空，尝试切换摄像头
+            self.switch_camera()
             return None
 
     def stop_capture(self):
@@ -98,13 +100,16 @@ class CameraCapture:
     def switch_camera(self):
 
         self.cap.release()
+        time.sleep(1)
         kill_all_video_processes()
+        time.sleep(1)
         self.cap = cv2.VideoCapture(-1, cv2.CAP_V4L)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
+        time.sleep(1)
         # 测试是否切换成功
         if self.cap.isOpened():
-            for i in range(10):
+            for i in range(self.max_frames):
                 ret, frame = self.cap.read()
                 if ret:
                     self.frame_queue.put(frame)
@@ -203,17 +208,72 @@ class Nano:
 
         return max_rectangle
 
-    def cal_zf_from_color(self, real_dis=13.6):
+    def cal_zf_from_kpu(self, real_dis=13.6):
+        self.detector = YOLOv5Detector(weights='yolov5_best.engine')
+
         while True:
             img = self.camera.read()
+            if img is None:
+                print("No frame in queue")
+                continue
+            resize_w = img.shape[1] * 640 // img.shape[0]
+            frame = cv2.resize(img, (resize_w, 640))
+            frame = frame[:, (resize_w - 640) // 2:(resize_w + 640) // 2]
+            predictions = self.detector.predict(frame)
+            img = cv2.resize(img, (320, 240))
+
+            x = 0
+            y = 0
+            w = 0
+            h = 0
+            conf = 0
+            for pred in predictions:
+                tx, ty, tw, th, tconf, cls, label = pred
+                if label != "class0":
+                    continue
+                if tconf > conf:
+                    conf = tconf
+                    x = tx
+                    y = ty
+                    w = tw
+                    h = th
+            if conf == 0:
+                print("no object")
+            else:
+                x = int(x * 320)
+                y = int(y * 240)
+                w = int(w * 320)
+                h = int(h * 240)
+                cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
+                cv2.putText(img, f"duck", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+                diag = np.sqrt(w ** 2 + h ** 2)
+                dis = self.calculate_distance_to_tag(diag)
+                zf = real_dis / dis
+                cv2.putText(img, f"zf: {zf:.2f}", (x, y + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+
+            cv2.imshow('USB Camera', img)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+    def cal_zf_from_color(self, real_dis=13.6):
+        time.sleep(3)
+        while True:
+            img = self.camera.read()
+            if img is None:
+                print("No frame in queue")
+                continue
             rect = self.find_approx_red_squares(img)
             if rect is not None:
                 x, y, w, h = rect
                 cx = x + w / 2
                 cy = y + h / 2
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 1)
-                width = w
-                height = h
+                x_zf = 320 / img.shape[1]
+                y_zf = 240 / img.shape[0]
+                width = w * x_zf
+                height = h * y_zf
                 diag = np.sqrt(width ** 2 + height ** 2)
                 dis = self.calculate_distance_to_tag(diag)
                 zf = real_dis / dis
@@ -229,6 +289,7 @@ class Nano:
         cv2.destroyAllWindows()
 
     def cal_zf_from_tag(self, real_dis=13.6):
+        time.sleep(3)
         while True:
             img = self.camera.read()
             if img is None:
@@ -241,9 +302,13 @@ class Nano:
 
                 width = tag.corners[2][0] - tag.corners[0][0]
                 height = tag.corners[2][1] - tag.corners[0][1]
+                x_zf = 320 / img.shape[1]
+                y_zf = 240 / img.shape[0]
+                width = width * x_zf
+                height = height * y_zf
                 diag = np.sqrt(width ** 2 + height ** 2)
                 dis = self.calculate_distance_to_tag(diag)
-                zf = - real_dis / dis
+                zf = real_dis / dis
                 cv2.putText(img, f"zf: {zf:.2f}", (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int) - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
@@ -254,6 +319,7 @@ class Nano:
         cv2.destroyAllWindows()
 
     def get_tag_dis_by_zf(self, zf):
+        time.sleep(3)
         while True:
             img = self.camera.read()
             apriltags = self.find_apriltags(img)
@@ -263,6 +329,10 @@ class Nano:
 
                 width = tag.corners[2][0] - tag.corners[0][0]
                 height = tag.corners[2][1] - tag.corners[0][1]
+                x_zf = 320 / img.shape[1]
+                y_zf = 240 / img.shape[0]
+                width = width * x_zf
+                height = height * y_zf
                 diag = np.sqrt(width ** 2 + height ** 2)
                 dis = self.calculate_distance_to_tag(diag)
                 real_dis = - zf * - dis
@@ -277,14 +347,18 @@ class Nano:
         cv2.destroyAllWindows()
 
     def get_color_dis_by_zf(self, zf):
+        time.sleep(3)
         while True:
-            ret, img = self.camera.read()
+            img = self.camera.read()
             rect = self.find_approx_red_squares(img)
             if rect is not None:
                 x, y, w, h = rect
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 1)
-                width = w
-                height = h
+                x_zf = 320 / img.shape[1]
+                y_zf = 240 / img.shape[0]
+                width = w * x_zf
+                height = h * y_zf
+
                 diag = np.sqrt(width ** 2 + height ** 2)
                 dis = self.calculate_distance_to_tag(diag)
                 real_dis = zf * dis
@@ -293,6 +367,54 @@ class Nano:
 
             else:
                 print("no red object")
+            cv2.imshow('USB Camera', img)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        self.camera.release()
+        cv2.destroyAllWindows()
+
+    def get_kpu_dis_by_zf(self, zf):
+        self.detector = YOLOv5Detector(weights='yolov5_best.engine')
+        while True:
+            img = self.camera.read()
+            resize_w = img.shape[1] * 640 // img.shape[0]
+            frame = cv2.resize(img, (resize_w, 640))
+            frame = frame[:, (resize_w - 640) // 2:(resize_w + 640) // 2]
+            predictions = self.detector.predict(frame)
+            img = cv2.resize(img, (320, 240))
+
+            x = 0
+            y = 0
+            w = 0
+            h = 0
+            conf = 0
+            for pred in predictions:
+                tx, ty, tw, th, tconf, cls, label = pred
+                if label != "class0":
+                    continue
+                if tconf > conf:
+                    conf = tconf
+                    x = tx
+                    y = ty
+                    w = tw
+                    h = th
+            if conf == 0:
+                print("no object")
+            else:
+                x = int(x * 320)
+                y = int(y * 240)
+                w = int(w * 320)
+                h = int(h * 240)
+                cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
+                cv2.putText(img, f"duck", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+                diag = np.sqrt(w ** 2 + h ** 2)
+                dis = self.calculate_distance_to_tag(diag)
+                real_dis = zf * dis
+                cv2.putText(img, f"real_dis: {real_dis:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0),
+                            1)
+
             cv2.imshow('USB Camera', img)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -353,6 +475,15 @@ class Nano:
                     width = tag.corners[2][0] - tag.corners[0][0]
                     height = tag.corners[2][1] - tag.corners[0][1]
                     diag = np.sqrt(width ** 2 + height ** 2)
+
+                    x_zf = 320 / img.shape[1]
+                    y_zf = 240 / img.shape[0]
+                    width = width * x_zf
+                    height = height * y_zf
+                    cy = cy * y_zf
+                    cx = cx * x_zf
+                    img = cv2.resize(img, (320, 240))
+
                     dis = self.calculate_distance_to_tag(diag)
 
                     uart_send_data["TagCx"] = cx
@@ -364,10 +495,19 @@ class Nano:
                 rect = self.find_approx_red_squares(img)
                 if rect is not None:
                     cv2.rectangle(img, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), (0, 255, 0), 2)
+
+                    x_zf = 320 / img.shape[1]
+                    y_zf = 240 / img.shape[0]
+                    rect = [rect[0] * x_zf, rect[1] * y_zf, rect[2] * x_zf, rect[3] * y_zf]
+
                     cx = rect[0] + rect[2] / 2
                     cy = rect[1] + rect[3] / 2
+
                     width = rect[2]
                     height = rect[3]
+
+                    img = cv2.resize(img, (320, 240))
+
                     diag = np.sqrt(width ** 2 + height ** 2)
                     dis = self.calculate_distance_to_tag(diag)
                     uart_send_data["ObjectZ"] = dis

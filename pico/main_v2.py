@@ -3,10 +3,10 @@ from task import Task
 
 if __name__ == '__main__':
     target_action = [
-        # {"mode": "find_apriltags", "id": 20, "action": "locate"},
+        {"mode": "find_apriltags", "id": 20, "action": "locate"},
         # {"mode": "find_apriltags", "id": 18, "action": "locate"},
-        {"mode": "kpu", "id": "", "action": "grab-by-kpu"},
-        # {"mode": "find_blobs", "id": "", "action": "grab-by-color"},
+        # {"mode": "kpu", "id": "", "action": "grab-by-kpu"},
+        {"mode": "find_blobs", "id": "", "action": "grab-by-color"},
         {"mode": "find_apriltags", "id": 86, "action": "put-down"},
         # {"mode": "kpu", "id": "", "action": "grab-by-kpu"},
         # {"mode": "find_apriltags", "id": 88, "action": "put-down"},
@@ -24,7 +24,8 @@ if __name__ == '__main__':
         "small_tag_zoomfactor": 2.51,
         "big_tag_zoomfactor": 6.18,
         "kpu_tag_zf": 0.19,
-        "duck_width_zoom_factor": 1.96,
+        "kpu_obj_zoom_factor": 1.96,
+        "color_obj_zoom_factor": 2,
         # "duck_height_zoom_factor": 829.6,
         # "claw_open_len": 13.5,  # cm
         # "claw_close_len": 14,
@@ -40,15 +41,15 @@ if __name__ == '__main__':
         "arm_up_speed": 40,
         "arm_down_speed": 20,
         # "claw_grab_len": 11,
-        # "claw_arm_up_len": 25,  # 大于这个高度，需要抬起机械臂
+        "claw_arm_up_len": 20,  # 大于这个高度，需要抬起机械臂
         # "grab_mode": False,
         # "grab_attempted": False,
         # "grab_attempted_get_count": 0,
         # "grab_attempted_all_count": 0,
         # "put_down_obj": False,
         # "arm_up_len": 2,
-        "grab_forward_count": 4,
-        "grab_forward_count_origin": 4,
+        "grab_forward_count": 2,
+        "grab_forward_count_origin": 2,
         # "wait_ct": 0,
         # "wait_ct_limit": 10,
         "forward_speed": 55
