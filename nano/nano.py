@@ -430,8 +430,7 @@ class Nano:
         return distance
 
     def run(self, manual_mode=None, manual_tag_id=None, manual_kpu_target=None):
-        if manual_kpu_target is None:
-            kpu_target = "class0"
+
         img_mode = "kpu"
         find_tag_id = 20
         self.detector = YOLOv5Detector(weights='yolov5_best.engine')
@@ -522,6 +521,14 @@ class Nano:
                     uart_send_data["ObjectWidth"] = rect[2]
                     uart_send_data["ObjectHeight"] = rect[3]
             elif img_mode == "kpu":
+                if pico_data.get("find_tag_id", None) is not None:
+                    manual_kpu_target = pico_data.get("find_tag_id", None)
+                    uart_send_data["find_tag_id"] = manual_kpu_target
+                if manual_kpu_target is None:
+                    kpu_target = "class0"
+                if manual_kpu_target is not None:
+                    kpu_target = manual_kpu_target
+
                 # 高度变为640，宽度按比例缩放，然后居中裁剪成640*640
                 resize_w = img.shape[1] * 640 // img.shape[0]
                 frame = cv2.resize(img, (resize_w, 640))

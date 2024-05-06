@@ -182,11 +182,18 @@ class Task:
         if dis > (self.rotate_in_front_of_obj + self.claw_open_len):
             self.close_to_obj_action(cx, cy, claw_range_level=1.5)
         else:
-            if cy < self.k210_y_center:
-                print("grab by kpu, arm up")
+            # if cy < self.k210_y_center:
+            #     print("grab by kpu, arm up")
+            #     self.car.armUp(self.arm_up_speed)
+            # else:
+            #     self.grab_mode = True
+            self.grab_mode = True
+            if cy > self.claw_arm_up_len:
                 self.car.armUp(self.arm_up_speed)
+                sleep(0.5)
+                print("arm up, and h is: ", cy)
             else:
-                self.grab_mode = True
+                self.car.keepForward(25)
 
     def grab_mode_in_kpu(self):
         for _ in range(1):
@@ -323,8 +330,8 @@ class Task:
                 tag_cy = int(data.get("TagCy", "999"))
                 find_tag_id = data.get("find_tag_id", None)
                 print(f"find tag id: {find_tag_id}, target id: {self.target_id_list[self.target_index]}")
-                if find_tag_id is None or find_tag_id != self.target_id_list[self.target_index]:
-                    uart_write_dict["find_tag_id"] = self.target_id_list[self.target_index]
+                # if find_tag_id is None or find_tag_id != self.target_id_list[self.target_index]:
+                #     uart_write_dict["find_tag_id"] = self.target_id_list[self.target_index]
 
             else:
                 obj_w = data.get("ObjectWidth", 999)
@@ -333,6 +340,8 @@ class Task:
                 obj_y = data.get("ObjectY", 0)
                 obj_z = data.get("ObjectZ", 0)
                 obj_status = data.get("ObjectStatus", "none")
+            if find_tag_id is None or find_tag_id != self.target_id_list[self.target_index]:
+                uart_write_dict["find_tag_id"] = self.target_id_list[self.target_index]
             if k210_img_mode != self.target_img_mode[self.target_index]:
                 uart_write_dict["img_mode"] = self.target_img_mode[self.target_index]
 

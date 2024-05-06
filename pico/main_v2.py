@@ -11,6 +11,8 @@ if __name__ == '__main__':
         # {"mode": "kpu", "id": "", "action": "grab-by-kpu"},
         # {"mode": "find_apriltags", "id": 88, "action": "put-down"},
         # {"mode": "kpu", "id": "", "action": "locate-by-kpu"},
+        {"mode": "kpu", "id": "class0", "action": "locate-by-kpu"},
+
         # {"mode": "find_apriltags", "id": 1, "action": "grab-by-kpu-apriltags"},
         # {"mode": "find_apriltags", "id": 88, "action": "put-down"},
         {"mode": "find_blobs", "id": "", "action": "finished"},
