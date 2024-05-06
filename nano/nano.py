@@ -208,7 +208,9 @@ class Nano:
 
         return max_rectangle
 
-    def cal_zf_from_kpu(self, real_dis=13.6):
+    def cal_zf_from_kpu(self, real_dis=13.6, manual_kpu_target=None):
+        if manual_kpu_target is None:
+            kpu_target = "class0"
         self.detector = YOLOv5Detector(weights='yolov5_best.engine')
 
         while True:
@@ -229,7 +231,7 @@ class Nano:
             conf = 0
             for pred in predictions:
                 tx, ty, tw, th, tconf, cls, label = pred
-                if label != "class0":
+                if label != kpu_target:
                     continue
                 if tconf > conf:
                     conf = tconf
@@ -245,7 +247,7 @@ class Nano:
                 w = int(w * 320)
                 h = int(h * 240)
                 cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
-                cv2.putText(img, f"duck", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                cv2.putText(img, kpu_target, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                 cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
                 diag = np.sqrt(w ** 2 + h ** 2)
@@ -406,7 +408,7 @@ class Nano:
                 w = int(w * 320)
                 h = int(h * 240)
                 cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
-                cv2.putText(img, f"duck", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                cv2.putText(img, f"class0", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                 cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
                 diag = np.sqrt(w ** 2 + h ** 2)
@@ -427,7 +429,9 @@ class Nano:
         distance = focal_length / tag_width_pixel
         return distance
 
-    def run(self, manual_mode=None, manual_tag_id=None):
+    def run(self, manual_mode=None, manual_tag_id=None, manual_kpu_target=None):
+        if manual_kpu_target is None:
+            kpu_target = "class0"
         img_mode = "kpu"
         find_tag_id = 20
         self.detector = YOLOv5Detector(weights='yolov5_best.engine')
@@ -533,7 +537,7 @@ class Nano:
                 conf = 0
                 for pred in predictions:
                     tx, ty, tw, th, tconf, cls, label = pred
-                    if label != "class0":
+                    if label != kpu_target:
                         continue
                     if tconf > conf:
                         conf = tconf
@@ -550,7 +554,7 @@ class Nano:
                     w = int(w * 320)
                     h = int(h * 240)
                     cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
-                    cv2.putText(img, f"duck", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                    cv2.putText(img, kpu_target, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                     cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
                     diag = np.sqrt(w ** 2 + h ** 2)
