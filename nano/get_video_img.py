@@ -37,14 +37,15 @@ def show_frame():
     global is_saving, frame_count
     # 从摄像头读取帧
     ret, frame = cap.read()
-    frame = cv2.resize(frame, (frame.shape[1] // 4, frame.shape[0] // 4))
+    frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
     # 如果正在保存图片,每隔30帧保存一张
     if is_saving:
         frame_count += 1
-        if frame_count % 30 == 0:
-            img_name = os.path.join(save_path, f'image_{frame_count//30}.jpg')
+        if frame_count % 10 == 0:
+            img_name = os.path.join(save_path, f'image_{frame_count//10}.jpg')
             cv2.imwrite(img_name, frame)
     # 将帧转换为Tkinter可以使用的格式
+    frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
     cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
     img = Image.fromarray(cv2image)
     imgtk = ImageTk.PhotoImage(image=img)
@@ -73,6 +74,7 @@ btn_start_saving.pack(anchor=CENTER, expand=True)
 # 创建停止保存图片按钮
 btn_stop_saving = Button(root, text="停止保存图片", width=50, command=stop_saving)
 btn_stop_saving.pack(anchor=CENTER, expand=True)
+
 show_frame()
 # 启动Tkinter事件循环
 # 设置窗口大小为320x240

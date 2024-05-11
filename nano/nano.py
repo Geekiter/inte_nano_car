@@ -2,11 +2,12 @@ import json
 # windows导入pupil_apriltags库
 import platform
 import queue
+import socket
 import time
 
 import numpy as np
 
-from yolov5_obj import YOLOv5Detector
+# from yolov5_obj import YOLOv5Detector
 
 if platform.system() == 'Windows':
     import pupil_apriltags as apriltag
@@ -124,6 +125,45 @@ class CameraCapture:
         print(f"Switched to camera index")
 
 
+class DetectorBySocket:
+    def __init__(self, host='192.168.31.189', port=8899):
+        self.host = host
+        self.port = port
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s.connect((self.host, self.port))
+
+    def predict(self, img):
+        # 保存为./tmp.jpg
+        fpath = '/home/nvidia/detector_tmp.jpg'
+        cv2.imwrite(fpath, img)
+        img_width = img.shape[1]
+        img_height = img.shape[0]
+        json_data = {
+            "fpath": fpath
+        }
+        json_str = json.dumps(json_data)
+        self.s.send(json_str.encode())
+        data = self.s.recv(1024)
+        json_load = json.loads(data)
+        # print(json_load)
+        predObjList = json_load['predObjList']
+        yolo_format = []
+        for predObj in predObjList:
+            x1 = predObj['x1']
+            y1 = predObj['y1']
+            x2 = predObj['x2']
+            y2 = predObj['y2']
+            conf = predObj['score']
+            cls = predObj['classID']
+            label = predObj['classDesc']
+            w = predObj['width'] / img_width
+            h = predObj['height'] / img_height
+            x = (x1 + x2) / 2 / img_width
+            y = (y1 + y2) / 2 / img_height
+            yolo_format.append([x, y, w, h, conf, cls, label])
+        return yolo_format
+
+
 class Nano:
     def __init__(self):
         serial_port = '/dev/ttyTHS1'
@@ -157,7 +197,7 @@ class Nano:
         self.smoothed_rectangles = []
         self.smooth_factor = 0.5  # 平滑因子
         self.smooth_max = 10  # 最大平滑次数
-        self.detector = None
+        self.detector = DetectorBySocket()
 
     def get_pico_data(self):
         json_byte = self.uart.frame_process()
@@ -211,7 +251,7 @@ class Nano:
     def cal_zf_from_kpu(self, real_dis=13.6, manual_kpu_target=None):
         if manual_kpu_target is None:
             kpu_target = "class0"
-        self.detector = YOLOv5Detector(weights='yolov5_best.engine')
+        # self.detector = YOLOv5Detector(weights='yolov5_best.engine')
 
         while True:
             img = self.camera.read()
@@ -376,7 +416,7 @@ class Nano:
         cv2.destroyAllWindows()
 
     def get_kpu_dis_by_zf(self, zf):
-        self.detector = YOLOv5Detector(weights='yolov5_best.engine')
+        # self.detector = YOLOv5Detector(weights='yolov5_best.engine')
         while True:
             img = self.camera.read()
             resize_w = img.shape[1] * 640 // img.shape[0]
@@ -433,7 +473,7 @@ class Nano:
 
         img_mode = "kpu"
         find_tag_id = 20
-        self.detector = YOLOv5Detector(weights='yolov5_best.engine')
+        # self.detector = YOLOv5Detector(weights='yolov5_best.engine')
 
         while True:
             uart_send_data = {}
@@ -543,9 +583,10 @@ class Nano:
                 h = 0
                 conf = 0
                 for pred in predictions:
+                    print(pred)
                     tx, ty, tw, th, tconf, cls, label = pred
-                    if label != kpu_target:
-                        continue
+                    # if label != kpu_target:
+                    #     continue
                     if tconf > conf:
                         conf = tconf
                         x = tx
@@ -561,7 +602,7 @@ class Nano:
                     w = int(w * 320)
                     h = int(h * 240)
                     cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
-                    cv2.putText(img, kpu_target, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                    cv2.putText(img, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                     cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
                     diag = np.sqrt(w ** 2 + h ** 2)
@@ -572,6 +613,7 @@ class Nano:
                     uart_send_data["ObjectZ"] = dis
                     uart_send_data["ObjectWidth"] = w
                     uart_send_data["ObjectHeight"] = h
+                # time.sleep(1)
 
             uart_send_data['ImageWidth'] = img.shape[1]
             uart_send_data['ImageHeight'] = img.shape[0]
