@@ -1,6 +1,7 @@
-import cv2
 import os
 from tkinter import *
+
+import cv2
 from PIL import Image, ImageTk
 
 # 创建保存图片的目录
@@ -13,7 +14,8 @@ cap = cv2.VideoCapture(0)
 
 # 检查摄像头是否成功打开
 if not cap.isOpened():
-    raise ValueError("无法打开摄像头")
+    raise ValueError("Unable to open camera")
+
 
 # 截取图片并保存的函数
 def capture_image():
@@ -24,19 +26,21 @@ def capture_image():
         img_name = os.path.join(save_path, 'capture_{}.png'.format(len(os.listdir(save_path))))
         # 保存图片
         cv2.imwrite(img_name, frame)
-        print(f'图片已保存为: {img_name}')
+        print(f'Image has been saved as {img_name}')
+
 
 # 创建Tkinter窗口
 root = Tk()
-root.title("摄像头预览")
+root.title("Preview")
 
 # 创建一个Label用于显示摄像头帧
 lmain = Label(root)
 lmain.pack()
 
 # 创建截取按钮
-btn_capture = Button(root, text="截取", width=50, command=capture_image)
+btn_capture = Button(root, text="Capture", width=50, command=capture_image)
 btn_capture.pack(anchor=CENTER, expand=True)
+
 
 # 更新帧的函数
 def show_frame():
@@ -51,6 +55,7 @@ def show_frame():
     lmain.configure(image=imgtk)
     # 每隔10毫秒更新一次帧
     lmain.after(10, show_frame)
+
 
 # 开始显示帧
 show_frame()

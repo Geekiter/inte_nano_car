@@ -2,12 +2,10 @@ import json
 # windows导入pupil_apriltags库
 import platform
 import queue
-import socket
 import time
 
+import face_recognition
 import numpy as np
-
-# from yolov5_obj import YOLOv5Detector
 
 if platform.system() == 'Windows':
     import pupil_apriltags as apriltag
@@ -20,6 +18,7 @@ from parse_json import SerialPort
 import threading
 import cv2
 import subprocess
+import os
 
 
 def kill_all_video_processes():
@@ -125,47 +124,9 @@ class CameraCapture:
         print(f"Switched to camera index")
 
 
-class DetectorBySocket:
-    def __init__(self, host='192.168.31.189', port=8899):
-        self.host = host
-        self.port = port
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.connect((self.host, self.port))
-
-    def predict(self, img):
-        # 保存为./tmp.jpg
-        fpath = '/home/nvidia/detector_tmp.jpg'
-        cv2.imwrite(fpath, img)
-        img_width = img.shape[1]
-        img_height = img.shape[0]
-        json_data = {
-            "fpath": fpath
-        }
-        json_str = json.dumps(json_data)
-        self.s.send(json_str.encode())
-        data = self.s.recv(1024)
-        json_load = json.loads(data)
-        # print(json_load)
-        predObjList = json_load['predObjList']
-        yolo_format = []
-        for predObj in predObjList:
-            x1 = predObj['x1']
-            y1 = predObj['y1']
-            x2 = predObj['x2']
-            y2 = predObj['y2']
-            conf = predObj['score']
-            cls = predObj['classID']
-            label = predObj['classDesc']
-            w = predObj['width'] / img_width
-            h = predObj['height'] / img_height
-            x = (x1 + x2) / 2 / img_width
-            y = (y1 + y2) / 2 / img_height
-            yolo_format.append([x, y, w, h, conf, cls, label])
-        return yolo_format
-
-
 class Nano:
     def __init__(self):
+
         serial_port = '/dev/ttyTHS1'
         baud_rate = 115200  # 波特率
         self.uart = SerialPort(serial_port, baud_rate)
@@ -197,7 +158,6 @@ class Nano:
         self.smoothed_rectangles = []
         self.smooth_factor = 0.5  # 平滑因子
         self.smooth_max = 10  # 最大平滑次数
-        self.detector = DetectorBySocket()
 
     def get_pico_data(self):
         json_byte = self.uart.frame_process()
@@ -206,6 +166,11 @@ class Nano:
             return pico_data
         else:
             return {}
+
+    def calculate_distance_to_tag(self, tag_width_pixel):
+        focal_length = self.camera_params[0][0]
+        distance = focal_length / tag_width_pixel
+        return distance
 
     def find_apriltags(self, img):
         detector = apriltag.Detector()
@@ -249,231 +214,216 @@ class Nano:
         return max_rectangle
 
     def cal_zf_from_kpu(self, real_dis=13.6, manual_kpu_target=None):
-        if manual_kpu_target is None:
-            kpu_target = "class0"
-        # self.detector = YOLOv5Detector(weights='yolov5_best.engine')
+        face_known_path = "/home/nvidia/nanocar/face_known/"
+        known_face_encodings = []
+        known_face_names = []
+        for file in os.listdir(face_known_path):
+            if file.endswith(".png") or file.endswith(".jpg"):
+                image = face_recognition.load_image_file(face_known_path + file)
+                face_encoding = face_recognition.face_encodings(image)[0]
+                known_face_encodings.append(face_encoding)
+                known_face_names.append(file.split(".")[0])
 
+        # Initialize some variables
+        face_locations = []
+        face_encodings = []
+        face_names = []
+        process_this_frame = True
         while True:
-            img = self.camera.read()
-            if img is None:
-                print("No frame in queue")
-                continue
-            resize_w = img.shape[1] * 640 // img.shape[0]
-            frame = cv2.resize(img, (resize_w, 640))
-            frame = frame[:, (resize_w - 640) // 2:(resize_w + 640) // 2]
-            predictions = self.detector.predict(frame)
-            img = cv2.resize(img, (320, 240))
-
-            x = 0
-            y = 0
-            w = 0
-            h = 0
-            conf = 0
-            for pred in predictions:
-                tx, ty, tw, th, tconf, cls, label = pred
-                if label != kpu_target:
-                    continue
-                if tconf > conf:
-                    conf = tconf
-                    x = tx
-                    y = ty
-                    w = tw
-                    h = th
-            if conf == 0:
-                print("no object")
+            if manual_kpu_target is None:
+                kpu_target = "cr"
             else:
-                x = int(x * 320)
-                y = int(y * 240)
-                w = int(w * 320)
-                h = int(h * 240)
-                cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
-                cv2.putText(img, kpu_target, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-                cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                kpu_target = manual_kpu_target
+            img = self.camera.read()
+            frame = img
+            if process_this_frame:
+                # Resize frame of video to 1/4 size for faster face recognition processing
+                # small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+                small_frame = frame
+                print(small_frame.shape)
 
+                # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_reco uses)
+                rgb_small_frame = cv2.cvtColor(small_frame[:, :, ::-1], cv2.COLOR_BGR2RGB)
+
+                # Find all the faces and face encodings in the current frame of video
+                face_locations = face_recognition.face_locations(rgb_small_frame)
+                face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+
+                face_names = []
+                for face_encoding in face_encodings:
+                    # See if the face is a match for the known face(s)
+                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+                    name = "Unknown"
+
+                    # # If a match was found in known_face_encodings, just use the first one.
+                    # if True in matches:
+                    #     first_match_index = matches.index(True)
+                    #     name = known_face_names[first_match_index]
+
+                    # Or instead, use the known face with the smallest distance to the new face
+                    face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+                    best_match_index = np.argmin(face_distances)
+                    if matches[best_match_index]:
+                        name = known_face_names[best_match_index]
+
+                    face_names.append(name)
+
+            process_this_frame = not process_this_frame
+
+            # Display the results
+            for (top, right, bottom, left), name in zip(face_locations, face_names):
+                # Scale back up face locations since the frame we detected in was scaled to 1/4 size
+                if name != kpu_target:
+                    continue
+
+                # top *= 4
+                # right *= 4
+                # bottom *= 4
+                # left *= 4
+
+                target_width = 320
+                target_height = 240
+                current_width = frame.shape[1]
+                current_height = frame.shape[0]
+                x_zf = target_width / current_width
+                y_zf = target_height / current_height
+
+                # Draw a box around the face
+                cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+
+                # Draw a label with a name below the face
+                cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+                font = cv2.FONT_HERSHEY_DUPLEX
+                cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+                if name != kpu_target:
+                    continue
+                x = (left + right) // 2 * x_zf
+                y = (top + bottom) // 2 * y_zf
+                w = (right - left) * x_zf
+                h = (bottom - top) * y_zf
                 diag = np.sqrt(w ** 2 + h ** 2)
                 dis = self.calculate_distance_to_tag(diag)
                 zf = real_dis / dis
-                cv2.putText(img, f"zf: {zf:.2f}", (x, y + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
-
-            cv2.imshow('USB Camera', img)
+                print(f"zf: {zf}")
+                cv2.putText(frame, f"zf: {zf}", (left + 6, bottom + 30), font, 1.0, (255, 255, 255), 1)
+            frame = cv2.resize(frame, (320, 240))
+            cv2.imshow('USB Camera', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
-    def cal_zf_from_color(self, real_dis=13.6):
-        time.sleep(3)
-        while True:
-            img = self.camera.read()
-            if img is None:
-                print("No frame in queue")
-                continue
-            rect = self.find_approx_red_squares(img)
-            if rect is not None:
-                x, y, w, h = rect
-                cx = x + w / 2
-                cy = y + h / 2
-                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 1)
-                x_zf = 320 / img.shape[1]
-                y_zf = 240 / img.shape[0]
-                width = w * x_zf
-                height = h * y_zf
-                diag = np.sqrt(width ** 2 + height ** 2)
-                dis = self.calculate_distance_to_tag(diag)
-                zf = real_dis / dis
-                cv2.putText(img, f"zf: {zf:.2f}", (x + w + 10, y + h + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0),
-                            1)
-
-            else:
-                print("no red object")
-            cv2.imshow('USB Camera', img)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        self.camera.release()
-        cv2.destroyAllWindows()
-
-    def cal_zf_from_tag(self, real_dis=13.6):
-        time.sleep(3)
-        while True:
-            img = self.camera.read()
-            if img is None:
-                print("No frame in queue")
-                continue
-            apriltags = self.find_apriltags(img)
-            for tag in apriltags:
-                cv2.rectangle(img, (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int)),
-                              (tag.corners[2][0].astype(int), tag.corners[2][1].astype(int)), (0, 255, 0), 1)
-
-                width = tag.corners[2][0] - tag.corners[0][0]
-                height = tag.corners[2][1] - tag.corners[0][1]
-                x_zf = 320 / img.shape[1]
-                y_zf = 240 / img.shape[0]
-                width = width * x_zf
-                height = height * y_zf
-                diag = np.sqrt(width ** 2 + height ** 2)
-                dis = self.calculate_distance_to_tag(diag)
-                zf = real_dis / dis
-                cv2.putText(img, f"zf: {zf:.2f}", (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int) - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-
-            cv2.imshow('USB Camera', img)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        self.camera.release()
-        cv2.destroyAllWindows()
-
-    def get_tag_dis_by_zf(self, zf):
-        time.sleep(3)
-        while True:
-            img = self.camera.read()
-            apriltags = self.find_apriltags(img)
-            for tag in apriltags:
-                cv2.rectangle(img, (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int)),
-                              (tag.corners[2][0].astype(int), tag.corners[2][1].astype(int)), (0, 255, 0), 1)
-
-                width = tag.corners[2][0] - tag.corners[0][0]
-                height = tag.corners[2][1] - tag.corners[0][1]
-                x_zf = 320 / img.shape[1]
-                y_zf = 240 / img.shape[0]
-                width = width * x_zf
-                height = height * y_zf
-                diag = np.sqrt(width ** 2 + height ** 2)
-                dis = self.calculate_distance_to_tag(diag)
-                real_dis = - zf * - dis
-                cv2.putText(img, f"real_dis: {real_dis:.2f}",
-                            (tag.corners[0][0].astype(int), tag.corners[0][1].astype(int) - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-
-            cv2.imshow('USB Camera', img)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        self.camera.release()
-        cv2.destroyAllWindows()
-
-    def get_color_dis_by_zf(self, zf):
-        time.sleep(3)
-        while True:
-            img = self.camera.read()
-            rect = self.find_approx_red_squares(img)
-            if rect is not None:
-                x, y, w, h = rect
-                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 1)
-                x_zf = 320 / img.shape[1]
-                y_zf = 240 / img.shape[0]
-                width = w * x_zf
-                height = h * y_zf
-
-                diag = np.sqrt(width ** 2 + height ** 2)
-                dis = self.calculate_distance_to_tag(diag)
-                real_dis = zf * dis
-                cv2.putText(img, f"real_dis: {real_dis:.2f}", (x + w + 10, y + h + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                            (0, 255, 0), 1)
-
-            else:
-                print("no red object")
-            cv2.imshow('USB Camera', img)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        self.camera.release()
-        cv2.destroyAllWindows()
-
     def get_kpu_dis_by_zf(self, zf):
-        # self.detector = YOLOv5Detector(weights='yolov5_best.engine')
+        face_known_path = "/home/nvidia/nanocar/face_known/"
+        known_face_encodings = []
+        known_face_names = []
+        for file in os.listdir(face_known_path):
+            if file.endswith(".png") or file.endswith(".jpg"):
+                image = face_recognition.load_image_file(face_known_path + file)
+                face_encoding = face_recognition.face_encodings(image)[0]
+                known_face_encodings.append(face_encoding)
+                known_face_names.append(file.split(".")[0])
+
+        # Initialize some variables
+        face_locations = []
+        face_encodings = []
+        face_names = []
+        process_this_frame = True
         while True:
             img = self.camera.read()
-            resize_w = img.shape[1] * 640 // img.shape[0]
-            frame = cv2.resize(img, (resize_w, 640))
-            frame = frame[:, (resize_w - 640) // 2:(resize_w + 640) // 2]
-            predictions = self.detector.predict(frame)
-            img = cv2.resize(img, (320, 240))
+            frame = img
+            if process_this_frame:
+                # Resize frame of video to 1/4 size for faster face recognition processing
+                # small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+                small_frame = frame
+                print(small_frame.shape)
 
-            x = 0
-            y = 0
-            w = 0
-            h = 0
-            conf = 0
-            for pred in predictions:
-                tx, ty, tw, th, tconf, cls, label = pred
-                if label != "class0":
+                # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_reco uses)
+                rgb_small_frame = cv2.cvtColor(small_frame[:, :, ::-1], cv2.COLOR_BGR2RGB)
+
+                # Find all the faces and face encodings in the current frame of video
+                face_locations = face_recognition.face_locations(rgb_small_frame)
+                face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+
+                face_names = []
+                for face_encoding in face_encodings:
+                    # See if the face is a match for the known face(s)
+                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+                    name = "Unknown"
+
+                    # # If a match was found in known_face_encodings, just use the first one.
+                    # if True in matches:
+                    #     first_match_index = matches.index(True)
+                    #     name = known_face_names[first_match_index]
+
+                    # Or instead, use the known face with the smallest distance to the new face
+                    face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+                    best_match_index = np.argmin(face_distances)
+                    if matches[best_match_index]:
+                        name = known_face_names[best_match_index]
+
+                    face_names.append(name)
+
+            process_this_frame = not process_this_frame
+
+            # Display the results
+            for (top, right, bottom, left), name in zip(face_locations, face_names):
+                # Scale back up face locations since the frame we detected in was scaled to 1/4 size
+
+                # top *= 4
+                # right *= 4
+                # bottom *= 4
+                # left *= 4
+
+                target_width = 320
+                target_height = 240
+                current_width = frame.shape[1]
+                current_height = frame.shape[0]
+                x_zf = target_width / current_width
+                y_zf = target_height / current_height
+
+                # Draw a box around the face
+                cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+
+                # Draw a label with a name below the face
+                cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+                font = cv2.FONT_HERSHEY_DUPLEX
+                cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+                if name != "cr":
                     continue
-                if tconf > conf:
-                    conf = tconf
-                    x = tx
-                    y = ty
-                    w = tw
-                    h = th
-            if conf == 0:
-                print("no object")
-            else:
-                x = int(x * 320)
-                y = int(y * 240)
-                w = int(w * 320)
-                h = int(h * 240)
-                cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
-                cv2.putText(img, f"class0", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-                cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-
+                x = (left + right) // 2 * x_zf
+                y = (top + bottom) // 2 * y_zf
+                w = (right - left) * x_zf
+                h = (bottom - top) * y_zf
                 diag = np.sqrt(w ** 2 + h ** 2)
                 dis = self.calculate_distance_to_tag(diag)
                 real_dis = zf * dis
-                cv2.putText(img, f"real_dis: {real_dis:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0),
-                            1)
-
-            cv2.imshow('USB Camera', img)
+                print(f"real_dis: {real_dis}")
+                cv2.putText(frame, f"real_dis: {real_dis}", (left + 6, bottom + 30), font, 1.0, (255, 255, 255), 1)
+            frame = cv2.resize(frame, (320, 240))
+            cv2.imshow('USB Camera', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-        self.camera.release()
-        cv2.destroyAllWindows()
-
-    # 计算相机到tag的距离
-    def calculate_distance_to_tag(self, tag_width_pixel):
-        focal_length = self.camera_params[0][0]
-        distance = focal_length / tag_width_pixel
-        return distance
 
     def run(self, manual_mode=None, manual_tag_id=None, manual_kpu_target=None):
 
         img_mode = "kpu"
         find_tag_id = 20
         # self.detector = YOLOv5Detector(weights='yolov5_best.engine')
+
+        # Load a sample picture and learn how to recognize it.
+        face_known_path = "/home/nvidia/nanocar/face_known/"
+        known_face_encodings = []
+        known_face_names = []
+        for file in os.listdir(face_known_path):
+            if file.endswith(".png") or file.endswith(".jpg"):
+                image = face_recognition.load_image_file(face_known_path + file)
+                face_encoding = face_recognition.face_encodings(image)[0]
+                known_face_encodings.append(face_encoding)
+                known_face_names.append(file.split(".")[0])
+
+        # Initialize some variables
+        face_locations = []
+        face_encodings = []
+        face_names = []
+        process_this_frame = True
 
         while True:
             uart_send_data = {}
@@ -565,47 +515,73 @@ class Nano:
                     manual_kpu_target = pico_data.get("find_tag_id", None)
                     uart_send_data["find_tag_id"] = manual_kpu_target
                 if manual_kpu_target is None:
-                    kpu_target = "class0"
+                    kpu_target = "messi"
                 if manual_kpu_target is not None:
                     kpu_target = manual_kpu_target
+                frame = img
+                if process_this_frame:
+                    # Resize frame of video to 1/4 size for faster face recognition processing
+                    # small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+                    small_frame = frame
+                    print(small_frame.shape)
 
-                # 高度变为640，宽度按比例缩放，然后居中裁剪成640*640
-                resize_w = img.shape[1] * 640 // img.shape[0]
-                frame = cv2.resize(img, (resize_w, 640))
-                frame = frame[:, (resize_w - 640) // 2:(resize_w + 640) // 2]
-                predictions = self.detector.predict(frame)
+                    # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_reco uses)
+                    rgb_small_frame = cv2.cvtColor(small_frame[:, :, ::-1], cv2.COLOR_BGR2RGB)
 
-                img = cv2.resize(img, (320, 240))
+                    # Find all the faces and face encodings in the current frame of video
+                    face_locations = face_recognition.face_locations(rgb_small_frame)
+                    face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
-                x = 0
-                y = 0
-                w = 0
-                h = 0
-                conf = 0
-                for pred in predictions:
-                    print(pred)
-                    tx, ty, tw, th, tconf, cls, label = pred
-                    if label != kpu_target:
+                    face_names = []
+                    for face_encoding in face_encodings:
+                        # See if the face is a match for the known face(s)
+                        matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+                        name = "Unknown"
+
+                        # # If a match was found in known_face_encodings, just use the first one.
+                        # if True in matches:
+                        #     first_match_index = matches.index(True)
+                        #     name = known_face_names[first_match_index]
+
+                        # Or instead, use the known face with the smallest distance to the new face
+                        face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+                        best_match_index = np.argmin(face_distances)
+                        if matches[best_match_index]:
+                            name = known_face_names[best_match_index]
+
+                        face_names.append(name)
+
+                process_this_frame = not process_this_frame
+
+                # Display the results
+                for (top, right, bottom, left), name in zip(face_locations, face_names):
+                    # Scale back up face locations since the frame we detected in was scaled to 1/4 size
+
+                    # top *= 4
+                    # right *= 4
+                    # bottom *= 4
+                    # left *= 4
+
+                    target_width = 320
+                    target_height = 240
+                    current_width = frame.shape[1]
+                    current_height = frame.shape[0]
+                    x_zf = target_width / current_width
+                    y_zf = target_height / current_height
+
+                    # Draw a box around the face
+                    cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+
+                    # Draw a label with a name below the face
+                    cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+                    font = cv2.FONT_HERSHEY_DUPLEX
+                    cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+                    if name != kpu_target:
                         continue
-                    if tconf > conf:
-                        conf = tconf
-                        x = tx
-                        y = ty
-                        w = tw
-                        h = th
-
-                if conf == 0:
-                    uart_send_data["ObjectStatus"] = "none"
-                else:
-
-                    x = int(x * 320)
-                    y = int(y * 240)
-                    w = int(w * 320)
-                    h = int(h * 240)
-                    cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
-                    cv2.putText(img, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-                    cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-
+                    x = (left + right) // 2 * x_zf
+                    y = (top + bottom) // 2 * y_zf
+                    w = (right - left) * x_zf
+                    h = (bottom - top) * y_zf
                     diag = np.sqrt(w ** 2 + h ** 2)
                     dis = self.calculate_distance_to_tag(diag)
                     uart_send_data["ObjectStatus"] = "get"
@@ -614,16 +590,19 @@ class Nano:
                     uart_send_data["ObjectZ"] = dis
                     uart_send_data["ObjectWidth"] = w
                     uart_send_data["ObjectHeight"] = h
+
                 # time.sleep(1)
+
+            img = cv2.resize(img, (320, 240))
 
             uart_send_data['ImageWidth'] = img.shape[1]
             uart_send_data['ImageHeight'] = img.shape[0]
 
             uart_send_data_json = json.dumps(uart_send_data)
+            print(uart_send_data_json)
 
             self.uart.port.write(uart_send_data_json.encode())  # 数据回传
 
-            img = cv2.resize(img, (320, 240))
             cv2.imshow('USB Camera', img)
             if cv2.waitKey(1) & 0xFF == ord('q'):  # 如果按下'q'键，则退出循环
                 break

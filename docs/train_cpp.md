@@ -50,3 +50,11 @@ python3 /root/dev/py/jetson-inference/python/training/detection/ssd/onnx_export.
 7. 启动主程序
 
 python3 /home/nvidia/nanocar/main.py
+
+---
+
+2.1. 编译cpp
+
+```shell
+ rm -rf build && mkdir build && cd build && cmake .. && make && cd ..
+```

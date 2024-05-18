@@ -65,6 +65,7 @@ class Task:
         self.grab_attempted_all_count = kwargs.get('grab_attempted_all_count', 0)
         self.put_down_obj = kwargs.get('put_down_obj', False)
         self.arm_up_len = kwargs.get('arm_up_len', 2)
+        self.grab_arm_up_count = kwargs.get('grab_arm_up_count', 8)
         self.grab_forward_count = kwargs.get('grab_forward_count', 8)
         self.grab_forward_count_origin = kwargs.get('grab_forward_count_origin', 8)
         self.wait_ct = kwargs.get('wait_ct', 0)
@@ -198,7 +199,7 @@ class Task:
     def grab_mode_in_kpu(self):
         for _ in range(1):
             self.car.keepBackward(self.backward_speed)
-        for _ in range(5):
+        for _ in range(self.grab_arm_up_count):
             self.car.armUp(self.arm_up_speed)
         for _ in range(self.grab_forward_count):
             self.car.keepForward(self.forward_speed)
@@ -292,8 +293,8 @@ class Task:
             print("get json error, original data: ", e, uart_read)
             return {}
 
-    def run(self):
-        self.car_init()
+    def run(self, only_get_uart_data=False):
+        if not only_get_uart_data: self.car_init()
         while self.is_finished is False and not self.test_mode:
             if not self.car.uart2.any():
                 continue
@@ -307,6 +308,8 @@ class Task:
             data = self.get_json(self.car.uart2)
 
             print(f"current data: {data}")
+            if only_get_uart_data:
+                continue
 
             k210_img_mode = data.get("img_mode", "N/A")
             uart_write_dict = {}
@@ -321,7 +324,8 @@ class Task:
             obj_w = 0
             obj_h = 0
             obj_z = 0
-            if self.target_action[self.target_index]["id"] != "":
+            # if self.target_action[self.target_index]["id"] != "":
+            if self.target_img_mode[self.target_index] == "find_apriltags":
                 tag_id = int(data.get("TagId", "999"))
                 tag_status = data.get("TagStatus", "none")
                 zoomfactor = self.get_zf(tag_id)
@@ -340,6 +344,8 @@ class Task:
                 obj_y = data.get("ObjectY", 0)
                 obj_z = data.get("ObjectZ", 0)
                 obj_status = data.get("ObjectStatus", "none")
+                find_tag_id = data.get("find_tag_id", None)
+                print(f"find tag id: {find_tag_id}, target id: {self.target_id_list[self.target_index]}")
             if find_tag_id is None or find_tag_id != self.target_id_list[self.target_index]:
                 uart_write_dict["find_tag_id"] = self.target_id_list[self.target_index]
             if k210_img_mode != self.target_img_mode[self.target_index]:

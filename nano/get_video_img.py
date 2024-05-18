@@ -17,7 +17,7 @@ cap = cv2.VideoCapture(0)
 
 # 检查摄像头是否成功打开
 if not cap.isOpened():
-    raise ValueError("无法打开摄像头")
+    raise ValueError("Can't find camera")
 
 # 是否正在保存图片
 is_saving = False
@@ -26,7 +26,7 @@ frame_count = 0
 
 # 创建Tkinter窗口
 root = Tk()
-root.title("摄像头预览")
+root.title("Preview")
 
 # 创建一个Label用于显示摄像头帧
 lmain = Label(root)
@@ -57,22 +57,22 @@ def show_frame():
 # 开始保存图片
 def start_saving():
     global is_saving, frame_count
-    print(f'开始保存图片')
+    print(f'Start saving images')
     is_saving = True
     frame_count = 0
 
 # 停止保存图片
 def stop_saving():
     global is_saving
-    print(f'停止保存图片')
+    print(f'Stop saving images')
     is_saving = False
 
 # 创建保存图片按钮
-btn_start_saving = Button(root, text="开始保存图片", width=50, command=start_saving)
+btn_start_saving = Button(root, text="Start", width=50, command=start_saving)
 btn_start_saving.pack(anchor=CENTER, expand=True)
 
 # 创建停止保存图片按钮
-btn_stop_saving = Button(root, text="停止保存图片", width=50, command=stop_saving)
+btn_stop_saving = Button(root, text="Stop", width=50, command=stop_saving)
 btn_stop_saving.pack(anchor=CENTER, expand=True)
 
 show_frame()
