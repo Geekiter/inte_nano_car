@@ -2,8 +2,8 @@ from nano import Nano
 
 if __name__ == '__main__':
     nano = Nano()
-    nano.run()
-    # nano.run(manual_mode="kpu", manual_tag_id=None, manual_kpu_target="class0")
+    # nano.run()
+    nano.run(manual_mode="find_blobs", manual_tag_id=None, manual_kpu_target="class0", manual_color_mode = "blue")
     # nano.cal_zf_from_color(real_dis=34.5)
     # nano.cal_zf_from_tag(real_dis=34.5)
     # nano.cal_zf_from_kpu(real_dis=34.5)

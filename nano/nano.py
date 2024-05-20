@@ -126,7 +126,7 @@ class CameraCapture:
 
 
 class DetectorBySocket:
-    def __init__(self, host='192.168.31.189', port=8899):
+    def __init__(self, host='127.0.0.1', port=8899):
         self.host = host
         self.port = port
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -190,9 +190,27 @@ class Nano:
         self.lower_red1 = np.array([0, 70, 50])
         self.upper_red1 = np.array([10, 255, 255])
 
-        # 第二个区间，接近180度
-        self.lower_red2 = np.array([170, 70, 50])
-        self.upper_red2 = np.array([180, 255, 255])
+        # 绿色的HSV范围
+        self.lower_green1 = np.array([35, 70, 50])
+        self.upper_green1 = np.array([77, 255, 255])
+
+        # 浅蓝色的HSV范围
+        self.lower_blue1 = np.array([78, 70, 50])
+        self.upper_blue1 = np.array([124, 255, 255])
+
+        # 黄色的HSV范围
+        self.lower_yellow1 = np.array([26, 70, 50])
+        self.upper_yellow1 = np.array([34, 255, 255])
+
+        self.color_range = {
+            "red": [self.lower_red1, self.upper_red1],
+            "green": [self.lower_green1, self.upper_green1],
+            "blue": [self.lower_blue1, self.upper_blue1],
+            "yellow": [self.lower_yellow1, self.upper_yellow1],
+        }
+
+        self.color_mode = "red"
+
         # 存储最近几次检测到的位置
         self.smoothed_rectangles = []
         self.smooth_factor = 0.5  # 平滑因子
@@ -213,12 +231,20 @@ class Nano:
 
         return detector.detect(gray)
 
-    def find_approx_red_squares(self, img):
+    def find_approx_red_squares(self, img, color_mode="red"):
 
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        mask_red1 = cv2.inRange(hsv, self.lower_red1, self.upper_red1)
-        mask_red2 = cv2.inRange(hsv, self.lower_red2, self.upper_red2)
-        mask = cv2.bitwise_or(mask_red1, mask_red2)
+        # mask_red1 = cv2.inRange(hsv, self.lower_red1, self.upper_red1)
+        # mask_red2 = cv2.inRange(hsv, self.lower_red2, self.upper_red2)
+        # mask_red1 = cv2.inRange(hsv, self.lower_green1, self.upper_green1)
+        # mask_red2 = cv2.inRange(hsv, self.lower_green2, self.upper_green2)
+        lower = self.color_range[color_mode][0]
+        upper = self.color_range[color_mode][1]
+        mask = cv2.inRange(hsv, lower, upper)
+        # mask_red2 = cv2.inRange(hsv, self.lower_blue2, self.upper_blue2)
+        # mask_red1 = cv2.inRange(hsv, self.lower_yellow1, self.upper_yellow1)
+        # mask_red2 = cv2.inRange(hsv, self.lower_yellow2, self.upper_yellow2)
+        # mask = cv2.bitwise_or(mask_red1, mask_red2)
         mask = cv2.erode(mask, None, iterations=2)
         mask = cv2.dilate(mask, None, iterations=2)
         kernel = np.ones((5, 5), np.uint8)
@@ -469,7 +495,7 @@ class Nano:
         distance = focal_length / tag_width_pixel
         return distance
 
-    def run(self, manual_mode=None, manual_tag_id=None, manual_kpu_target=None):
+    def run(self, manual_mode=None, manual_tag_id=None, manual_kpu_target=None, manual_color_mode=None):
 
         img_mode = "kpu"
         find_tag_id = 20
@@ -535,7 +561,14 @@ class Nano:
                     uart_send_data["TagHeight"] = height
                     uart_send_data["TagTz"] = dis
             elif img_mode == "find_blobs":
-                rect = self.find_approx_red_squares(img)
+                if pico_data.get("find_tag_id", None) is not None or pico_data.get("find_tag_id", None) is not "":
+                    color_mode = pico_data.get("find_tag_id", None)
+                    uart_send_data["find_tag_id"] = color_mode
+                if manual_color_mode is None:
+                    color_mode = "red"
+                if manual_color_mode is not None:
+                    color_mode = manual_color_mode
+                rect = self.find_approx_red_squares(img, color_mode)
                 if rect is not None:
                     cv2.rectangle(img, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), (0, 255, 0), 2)
 
@@ -585,8 +618,7 @@ class Nano:
                 for pred in predictions:
                     print(pred)
                     tx, ty, tw, th, tconf, cls, label = pred
-                    if label != kpu_target:
-                        continue
+
                     if tconf > conf:
                         conf = tconf
                         x = tx
@@ -605,7 +637,8 @@ class Nano:
                     cv2.rectangle(img, (x - w // 2, y - h // 2), (x + w // 2, y + h // 2), (0, 255, 0), 1)
                     cv2.putText(img, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                     cv2.putText(img, f"conf: {conf:.2f}", (x, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-
+                    if label != kpu_target:
+                        continue
                     diag = np.sqrt(w ** 2 + h ** 2)
                     dis = self.calculate_distance_to_tag(diag)
                     uart_send_data["ObjectStatus"] = "get"
