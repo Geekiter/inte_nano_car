@@ -6,7 +6,7 @@ from motorPCA9685 import MotorDriver
 
 
 class Car:
-    def __init__(self):
+    def __init__(self, uart_tx=16, uart_rx=17):
 
         self.target_index = 0
 
@@ -16,7 +16,7 @@ class Car:
         self.pwmb = PWM(Pin(11))
         self.pwmb.freq(1000)
 
-        self.uart2 = UART(0, baudrate=115200, tx=Pin(16), rx=Pin(17))
+        self.uart2 = UART(0, baudrate=115200, tx=Pin(uart_tx), rx=Pin(uart_rx))
 
         self.m = MotorDriver()
         # ## arm

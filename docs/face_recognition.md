@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
 
 ```shell
-python3 main.py
+python3 main_backup.py
 ```
 
 # 4. 测试zoom factor
@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
 
 ```shell
-python3 main.py
+python3 main_backup.py
 ```
 
 # 5. 执行任务
@@ -59,5 +59,5 @@ if __name__ == '__main__':
 ```
 
 ```shell
-python3 main.py
+python3 main_backup.py
 ```
