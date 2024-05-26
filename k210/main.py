@@ -50,8 +50,8 @@ threshold_list = {
 }
 
 img_mode = "find_apriltags"
-# img_mode = "kpu"
-img_mode = "find_blobs"
+img_mode = "kpu"
+# img_mode = "find_blobs"
 task = None
 task = kpu.load(model_addr)
 kpu.init_yolo2(task, 0.5, 0.3, 5, anchors)
@@ -138,7 +138,7 @@ while True:
     elif img_mode == "find_blobs":
         img = sensor.snapshot()
         if find_tag_id is None or find_tag_id not in ['red', 'blue', 'yellow', 'green']:
-            find_tag_id = 'red'd
+            find_tag_id = 'red'
         current_threshold = threshold_list[find_tag_id]
         blobs = img.find_blobs(current_threshold, pixels_threshold=100)
         if blobs:
