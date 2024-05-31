@@ -1,19 +1,3 @@
-# range.py Test of asynchronous mqtt client with clean session False.
-# (C) Copyright Peter Hinch 2017-2022.
-# Released under the MIT licence.
-
-# Now uses the event interface
-
-# Public brokers https://github.com/mqtt/mqtt.github.io/wiki/public_brokers
-
-# This demo is for wireless range tests. If OOR the red LED will light.
-# In range the blue LED will pulse for each received message.
-# Uses clean sessions to avoid backlog when OOR.
-
-# red LED: ON == WiFi fail
-# blue LED pulse == message received
-# Publishes connection statistics.
-
 from mqtt_as import MQTTClient
 from mqtt_local import wifi_led, blue_led, config
 import uasyncio as asyncio

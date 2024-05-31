@@ -1,10 +1,3 @@
-# mqtt_as.py Asynchronous version of umqtt.robust
-# (C) Copyright Peter Hinch 2017-2023.
-# Released under the MIT licence.
-
-# Pyboard D support added also RP2/default
-# Various improvements contributed by Kevin Köck.
-
 import gc
 import usocket as socket
 import ustruct as struct
