@@ -7,6 +7,8 @@ import time
 
 import numpy as np
 
+from yolov5_obj import YOLOv5Detector
+
 # from yolov5_obj import YOLOv5Detector
 
 if platform.system() == 'Windows':
@@ -165,7 +167,7 @@ class DetectorBySocket:
 
 
 class Nano:
-    def __init__(self):
+    def __init__(self, detect_mode="yolov5"):
         serial_port = '/dev/ttyTHS1'
         baud_rate = 115200  # 波特率
         self.uart = SerialPort(serial_port, baud_rate)
@@ -215,7 +217,10 @@ class Nano:
         self.smoothed_rectangles = []
         self.smooth_factor = 0.5  # 平滑因子
         self.smooth_max = 10  # 最大平滑次数
-        self.detector = DetectorBySocket()
+        if detect_mode == "socket":
+            self.detector = DetectorBySocket()
+        else:
+            self.detector = YOLOv5Detector(weights='yolov5_best.engine')
 
     def get_pico_data(self):
         json_byte = self.uart.frame_process()
@@ -499,7 +504,6 @@ class Nano:
 
         img_mode = "kpu"
         find_tag_id = 20
-        # self.detector = YOLOv5Detector(weights='yolov5_best.engine')
 
         while True:
             uart_send_data = {}
