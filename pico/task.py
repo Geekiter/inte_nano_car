@@ -75,6 +75,12 @@ class Task:
         self.search_count = 0
         self.discovered_obj = False
 
+        self.signs_action = {
+            "left": self.car.keepTurnLeft(self.turn_left_speed),
+            "right": self.car.keepTurnRight(self.turn_right_speed),
+            "stop": self.car.stopMove(),
+        }
+
     def get_zf(self, target_id):
         if target_id in self.big_tag_id_list:
             return self.big_tag_zoomfactor
@@ -293,7 +299,24 @@ class Task:
             print("get json error, original data: ", e, uart_read)
             return {}
 
+    def validate_target_action(self):
+        # is array
+        if not isinstance(self.target_action, list):
+            return False
+        # is not empty
+        if len(self.target_action) == 0:
+            return False
+        # item must have mode, id, action
+        for item in self.target_action:
+            if not isinstance(item, dict):
+                return False
+            if "mode" not in item or "id" not in item or "action" not in item:
+                return False
+
     def run(self, only_get_uart_data=False):
+        if not self.validate_target_action():
+            print("target action is invalid")
+            return
         if not only_get_uart_data: self.car_init()
         while self.is_finished is False and not self.test_mode:
             if not self.car.uart2.any():
@@ -438,3 +461,36 @@ class Task:
             elif self.target_action_list[self.target_index] == "locate-by-kpu":
                 obj_dis = self.kpu_obj_zoom_factor * obj_z
                 self.kpu_locate_action(obj_x, obj_y, obj_dis)
+
+    def run_detect_signs(self, only_get_uart_data=False):
+        # get data
+        data = {}
+        if not only_get_uart_data: self.car_init()
+        while self.is_finished is False and not self.test_mode:
+            if not self.car.uart2.any():
+                continue
+
+            if self.target_index < len(self.target_action_list):
+                print(f"current target action is: {self.target_action_list[self.target_index]}")
+            else:
+                print("target action list is empty")
+                break
+
+            data = self.get_json(self.car.uart2)
+
+            print(f"current data: {data}")
+            if only_get_uart_data:
+                continue
+        # do action
+        obj_w = data.get("ObjectWidth", 999)
+        obj_h = data.get("ObjectHeight", 999)
+        obj_x = data.get("ObjectX", 0)
+        obj_y = data.get("ObjectY", 0)
+        obj_z = data.get("ObjectZ", 0)
+        obj_status = data.get("ObjectStatus", "none")
+        find_tag_id = data.get("find_tag_id", "stop")
+        if obj_status == "get":
+            action = self.signs_action.get(find_tag_id, self.signs_action["stop"])
+
+            for _ in range(10):
+                action()
