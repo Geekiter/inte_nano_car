@@ -6,7 +6,7 @@ from mqtt_obj import MQTT
 from task import Task
 
 if __name__ == '__main__':
-    target_action = [
+    task_list = [
         # {"mode": "find_apriltags", "id": 20, "action": "locate"},
         # {"mode": "find_apriltags", "id": 18, "action": "locate"},
         {"mode": "kpu", "id": "duck", "action": "grab-by-kpu"},
@@ -80,7 +80,7 @@ if __name__ == '__main__':
 
         car = Car(uart_tx=12, uart_rx=13)
         # car.test()
-        task = Task(car=car, target_action=target_action, **option_params)
-        task.run(only_get_uart_data=True)
+        task = Task(car=car, target_action=task_list, **option_params)
+        task.run(only_get_uart_data=False)
 
         time.sleep(1)
