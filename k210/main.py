@@ -40,7 +40,8 @@ c_y = 120 * 0.5  # find_apriltags 如果没有设置，则默认为这个 (the i
 anchors = [2.41, 2.62, 1.06, 1.12, 1.94, 2.0, 1.41, 1.53, 0.59, 0.75]
 # model_addr = "/sd/duck_in224.kmodel"
 model_addr = 0x300000
-labels = ["red_box", "duck"]
+labels = ['left', 'right', 'park', 'stop', 'turning']
+# labels = ["red_box", "duck"]
 
 threshold_list = {
     "red": [(72, 20, 127, 41, 56, 6)],
@@ -178,7 +179,7 @@ while True:
         if objects:
             for obj in objects:
                 classid = labels[obj.classid()]
-                if classid != find_tag_id:
+                if classid != find_tag_id and find_tag_id != "get_all_id":
                     continue
 
                 pos = obj.rect()

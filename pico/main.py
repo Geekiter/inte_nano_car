@@ -5,9 +5,9 @@ if __name__ == '__main__':
     target_action = [
         # {"mode": "find_apriltags", "id": 20, "action": "locate"},
         # {"mode": "find_apriltags", "id": 18, "action": "locate"},
-        {"mode": "kpu", "id": "duck", "action": "grab-by-kpu"},
+        # {"mode": "kpu", "id": "duck", "action": "grab-by-kpu"},
         # {"mode": "find_blobs", "id": "yellow", "action": "grab-by-color"},
-        {"mode": "find_apriltags", "id": 86, "action": "put-down"},
+        # {"mode": "find_apriltags", "id": 86, "action": "put-down"},
         # {"mode": "kpu", "id": "", "action": "grab-by-kpu"},
         # {"mode": "find_apriltags", "id": 88, "action": "put-down"},
         # {"mode": "kpu", "id": "", "action": "locate-by-kpu"},
@@ -15,6 +15,7 @@ if __name__ == '__main__':
 
         # {"mode": "find_apriltags", "id": 1, "action": "grab-by-kpu-apriltags"},
         # {"mode": "find_apriltags", "id": 88, "action": "put-down"},
+        {"mode": "kpu", "id": "get_all_id", "action": "sign"},
         {"mode": "find_blobs", "id": "", "action": "finished"},
     ]
     option_params = {
@@ -55,7 +56,8 @@ if __name__ == '__main__':
         "grab_forward_count_origin": 4,
         # "wait_ct": 0,
         # "wait_ct_limit": 10,
-        "forward_speed": 55
+        "forward_speed": 55,
+        "count_in_sign": 10
     }
 
     car = Car(uart_tx=12, uart_rx=13)
