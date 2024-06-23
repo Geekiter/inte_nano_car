@@ -13,7 +13,7 @@ from yolov5_obj import YOLOv5Detector
 
 if platform.system() == 'Windows':
     import pupil_apriltags as apriltag
-# linux导入apriltag库
+# import apriltag in linux
 elif platform.system() == 'Linux':
     import apriltag
 
@@ -63,7 +63,7 @@ class CameraCapture:
         while self.running:
             ret, frame = self.cap.read()
             if not ret:
-                # self.switch_camera()  # 如果读取失败，尝试切换摄像头
+                # self.switch_camera()  # if failed to read, switch camera
                 # continue
                 break
             if not self.frame_queue.full():
@@ -110,13 +110,13 @@ class CameraCapture:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
         time.sleep(1)
-        # 测试是否切换成功
+        # test if switch successfully
         if self.cap.isOpened():
             for i in range(self.max_frames):
                 ret, frame = self.cap.read()
                 if ret:
                     self.frame_queue.put(frame)
-            # 重启线程
+            # restart thread
             self.capture_thread.join()
             self.capture_thread = threading.Thread(target=self.capture_frames)
             self.capture_thread.start()
@@ -135,7 +135,7 @@ class DetectorBySocket:
         self.s.connect((self.host, self.port))
 
     def predict(self, img):
-        # 保存为./tmp.jpg
+        # save as ./tmp.jpg
         fpath = '/home/nvidia/detector_tmp.jpg'
         cv2.imwrite(fpath, img)
         img_width = img.shape[1]
@@ -169,7 +169,7 @@ class DetectorBySocket:
 class Nano:
     def __init__(self, detect_mode="yolov5"):
         serial_port = '/dev/ttyTHS1'
-        baud_rate = 115200  # 波特率
+        baud_rate = 115200  # baud rate
         self.uart = SerialPort(serial_port, baud_rate)
 
         self.camera_params = np.array(
@@ -183,24 +183,23 @@ class Nano:
         t1.setDaemon(True)
         t1.start()
 
-        # 定义橘红色的HSV范围
+        # define the HSV range of orange color
         self.lower_orange = np.array([0, 70, 50])
         self.upper_orange = np.array([15, 255, 255])
 
-        # 红色的HSV范围
-        # 第一个区间，接近0度
+        # red color range
         self.lower_red1 = np.array([0, 70, 50])
         self.upper_red1 = np.array([10, 255, 255])
 
-        # 绿色的HSV范围
+        # green color range
         self.lower_green1 = np.array([35, 70, 50])
         self.upper_green1 = np.array([77, 255, 255])
 
-        # 浅蓝色的HSV范围
+        # light blue
         self.lower_blue1 = np.array([78, 70, 50])
         self.upper_blue1 = np.array([124, 255, 255])
 
-        # 黄色的HSV范围
+        # yellow
         self.lower_yellow1 = np.array([26, 70, 50])
         self.upper_yellow1 = np.array([34, 255, 255])
 
@@ -213,10 +212,10 @@ class Nano:
 
         self.color_mode = "red"
 
-        # 存储最近几次检测到的位置
+        # save the last few detected positions
         self.smoothed_rectangles = []
-        self.smooth_factor = 0.5  # 平滑因子
-        self.smooth_max = 10  # 最大平滑次数
+        self.smooth_factor = 0.5  #  smoothing factor
+        self.smooth_max = 10  # max smoothing times
         if detect_mode == "socket":
             self.detector = DetectorBySocket()
         else:
@@ -658,13 +657,13 @@ class Nano:
 
             uart_send_data_json = json.dumps(uart_send_data)
 
-            self.uart.port.write(uart_send_data_json.encode())  # 数据回传
+            self.uart.port.write(uart_send_data_json.encode())  # data feedback
 
             img = cv2.resize(img, (320, 240))
             cv2.imshow('USB Camera', img)
-            if cv2.waitKey(1) & 0xFF == ord('q'):  # 如果按下'q'键，则退出循环
+            if cv2.waitKey(1) & 0xFF == ord('q'):  # if enter 'q', and then exit
                 break
 
-        # 完成所有操作后，释放捕获器
+        #  finish all operation and release the camera
         # self.camera.release()
         cv2.destroyAllWindows()

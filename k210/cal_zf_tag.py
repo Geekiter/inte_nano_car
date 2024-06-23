@@ -18,12 +18,10 @@ sensor.skip_frames(time=2000)
 sensor.set_vflip(1)
 clock = time.clock()
 
-# 映射串口引脚
 fm.register(6, fm.fpioa.UART1_RX, force=True)
 fm.register(7, fm.fpioa.UART1_TX, force=True)
 fm.register(16, fm.fpioa.GPIO1)
 KEY = GPIO(GPIO.GPIO1, GPIO.IN)
-# 初始化串口
 uart = UART(UART.UART1, 115200, read_buf_len=4096)
 uart.write("Hello pico! K210 start")
 

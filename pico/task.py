@@ -70,6 +70,7 @@ class Task:
         self.grab_forward_count_origin = kwargs.get('grab_forward_count_origin', 8)
         self.wait_ct = kwargs.get('wait_ct', 0)
         self.wait_ct_limit = kwargs.get('wait_ct_limit', 10)
+        self.count_in_sign = kwargs.get('count_in_sign', 10)
 
         self.is_finished = False
         self.search_count = 0
@@ -78,7 +79,6 @@ class Task:
         self.signs_action = {
             "left": self.car.keepTurnLeft(self.turn_left_speed),
             "right": self.car.keepTurnRight(self.turn_right_speed),
-            "stop": self.car.stopMove(),
         }
 
     def get_zf(self, target_id):
@@ -312,11 +312,30 @@ class Task:
                 return False
             if "mode" not in item or "id" not in item or "action" not in item:
                 return False
+        return True
+
+    def sign_action(self, obj_id):
+        if obj_id is "stop":
+            self.car.stopMove()
+            self.target_index += 1
+        elif obj_id is "left":
+            for _ in range(self.count_in_sign):
+                self.car.keepTurnLeft(self.turn_left_speed)
+        elif obj_id is "right":
+            for _ in range(self.count_in_sign):
+                self.car.keepTurnRight(self.turn_right_speed)
+        elif obj_id is "turning":
+            for _ in range(5 * self.count_in_sign):
+                self.car.keepTurnRight(self.turn_right_speed)
+        elif obj_id is "park":
+            self.car.stopMove()
+        else:
+            print("sign action is invalid")
 
     def run(self, only_get_uart_data=False):
-        if not self.validate_target_action():
-            print("target action is invalid")
-            return
+        # if not self.validate_target_action():
+        #     print("target action is invalid")
+        #     return
         if not only_get_uart_data: self.car_init()
         while self.is_finished is False and not self.test_mode:
             if not self.car.uart2.any():
@@ -366,6 +385,7 @@ class Task:
                 obj_x = data.get("ObjectX", 0)
                 obj_y = data.get("ObjectY", 0)
                 obj_z = data.get("ObjectZ", 0)
+                obj_id = data.get("ObjectId", 0)
                 obj_status = data.get("ObjectStatus", "none")
                 find_tag_id = data.get("find_tag_id", None)
                 print(f"find tag id: {find_tag_id}, target id: {self.target_id_list[self.target_index]}")
@@ -461,36 +481,5 @@ class Task:
             elif self.target_action_list[self.target_index] == "locate-by-kpu":
                 obj_dis = self.kpu_obj_zoom_factor * obj_z
                 self.kpu_locate_action(obj_x, obj_y, obj_dis)
-
-    def run_detect_signs(self, only_get_uart_data=False):
-        # get data
-        data = {}
-        if not only_get_uart_data: self.car_init()
-        while self.is_finished is False and not self.test_mode:
-            if not self.car.uart2.any():
-                continue
-
-            if self.target_index < len(self.target_action_list):
-                print(f"current target action is: {self.target_action_list[self.target_index]}")
-            else:
-                print("target action list is empty")
-                break
-
-            data = self.get_json(self.car.uart2)
-
-            print(f"current data: {data}")
-            if only_get_uart_data:
-                continue
-        # do action
-        obj_w = data.get("ObjectWidth", 999)
-        obj_h = data.get("ObjectHeight", 999)
-        obj_x = data.get("ObjectX", 0)
-        obj_y = data.get("ObjectY", 0)
-        obj_z = data.get("ObjectZ", 0)
-        obj_status = data.get("ObjectStatus", "none")
-        find_tag_id = data.get("find_tag_id", "stop")
-        if obj_status == "get":
-            action = self.signs_action.get(find_tag_id, self.signs_action["stop"])
-
-            for _ in range(10):
-                action()
+            elif self.target_action_list[self.target_index] == "sign":
+                self.sign_action(obj_id)

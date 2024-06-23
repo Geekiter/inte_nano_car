@@ -10,14 +10,14 @@ print(os.listdir("/"))
 
 qvga_lcd = (320, 240)
 qqvga_lcd = (160, 120)
-lcd.init(freq=15000000)  # 初始化屏幕显示
-sensor.reset()  # 复位并初始化摄像头
-sensor.set_pixformat(sensor.RGB565)  # 设置摄像头输出格式为 RGB565
-sensor.set_framesize(sensor.QVGA)  # 设置摄像头输出大小为 QVGA (320x240)
-# sensor.set_auto_gain(False)  # 必须关闭此功能，以防止图像冲洗…
-# sensor.set_auto_whitebal(False)  # 必须关闭此功能，以防止图像冲洗…
-#sensor.set_hmirror(1)  # 设置摄像头水平镜像
-sensor.set_vflip(1)  # 设置摄像头垂直翻转
+lcd.init(freq=15000000)
+sensor.reset()
+sensor.set_pixformat(sensor.RGB565)
+sensor.set_framesize(sensor.QQVGA)
+# sensor.set_auto_gain(False)
+# sensor.set_auto_whitebal(False)
+#sensor.set_hmirror(1)
+sensor.set_vflip(1)
 
 # sensor.set_windowing((160, 120))
 sensor.run(1)

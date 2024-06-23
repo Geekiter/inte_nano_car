@@ -16,7 +16,7 @@ find_tag_id = "red"
 lcd.init()
 sensor.reset(freq=20000000)
 sensor.set_pixformat(sensor.RGB565)
-sensor.set_framesize(sensor.QQVGA)  # 如果分辨率大得多，内存就不够用了……
+sensor.set_framesize(sensor.QQVGA)
 sensor.skip_frames(time=2000)
 sensor.set_vflip(1)
 clock = time.clock()
@@ -31,10 +31,10 @@ uart = UART(UART.UART1, 115200, read_buf_len=4096)
 uart.write("Hello pico! K210 start")
 # kpu
 task = None
-f_x = (2.8 / 3.984) * 160  # find_apriltags 如果没有设置，则默认为这个
-f_y = (2.8 / 2.952) * 120  # find_apriltags 如果没有设置，则默认为这个
-c_x = 160 * 0.5  # find_apriltags 如果没有设置，则默认为这个 (the image.w * 0.5)
-c_y = 120 * 0.5  # find_apriltags 如果没有设置，则默认为这个 (the image.h * 0.5)
+f_x = (2.8 / 3.984) * 160
+f_y = (2.8 / 2.952) * 120
+c_x = 160 * 0.5
+c_y = 120 * 0.5
 threshold_list = {
     "red": [(72, 20, 127, 41, 56, 6)],
     "blue": [(51, 80, -29, 1, -32, -12)],

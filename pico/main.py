@@ -33,18 +33,18 @@ if __name__ == '__main__':
         # "claw_open_len": 13.5,  # cm
         # "claw_close_len": 14,
         # "test_mode": False,
-        # "k210_cam_offset": 85 - 160 / 2,  # 相机安装在机械臂上的偏移量
+        # "k210_cam_offset": 85 - 160 / 2,  # camera center offset from arm center
         # "claw_range": (90 - 75) / 2,
         # "k210_qqvga": (120, 160),
         # "k210_qvga": (240, 320),
         "current_resolution": (120, 160),
-        "arm_range": 30,  # pixel 上下浮动范围
-        "rotate_in_front_of_obj": 5,  # cm 在物体前方允许旋转的距离
+        "arm_range": 30,  # pixel range
+        "rotate_in_front_of_obj": 5,  # cm allow rotate in front of obj
         # "locate_stop_dis": 48,  # cm
         "arm_up_speed": 40,
         "arm_down_speed": 20,
         # "claw_grab_len": 11,
-        "claw_arm_up_len": 30,  # 大于这个高度，需要抬起机械臂
+        "claw_arm_up_len": 30,  # when arm up, the height of claw
         # "grab_mode": False,
         # "grab_attempted": False,
         # "grab_attempted_get_count": 0,

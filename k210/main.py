@@ -17,24 +17,22 @@ print(os.listdir("/"))
 lcd.init()
 sensor.reset(freq=20000000)
 sensor.set_pixformat(sensor.RGB565)
-sensor.set_framesize(sensor.QQVGA)  # 如果分辨率大得多，内存就不够用了……
+sensor.set_framesize(sensor.QQVGA)
 sensor.skip_frames(time=2000)
 sensor.set_vflip(1)
 clock = time.clock()
 
-# 映射串口引脚
 fm.register(6, fm.fpioa.UART1_RX, force=True)
 fm.register(7, fm.fpioa.UART1_TX, force=True)
 fm.register(16, fm.fpioa.GPIO1)
 KEY = GPIO(GPIO.GPIO1, GPIO.IN)
-# 初始化串口
 uart = UART(UART.UART1, 115200, read_buf_len=4096)
 uart.write("Hello pico! K210 restart")
 
-f_x = (2.8 / 3.984) * 160  # find_apriltags 如果没有设置，则默认为这个
-f_y = (2.8 / 2.952) * 120  # find_apriltags 如果没有设置，则默认为这个
-c_x = 160 * 0.5  # find_apriltags 如果没有设置，则默认为这个 (the image.w * 0.5)
-c_y = 120 * 0.5  # find_apriltags 如果没有设置，则默认为这个 (the image.h * 0.5)
+f_x = (2.8 / 3.984) * 160
+f_y = (2.8 / 2.952) * 120
+c_x = 160 * 0.5
+c_y = 120 * 0.5
 
 # kpu
 anchors = [2.41, 2.62, 1.06, 1.12, 1.94, 2.0, 1.41, 1.53, 0.59, 0.75]
@@ -82,7 +80,6 @@ while True:
         read_data = uart.read(256)
         if read_data:
             read_str = read_data.decode("utf-8")
-            # 查找{和}第一个出现的位置，然后截取字符串
             if "{" in read_str and "}" in read_str:
                 read_str = read_str[read_str.index("{"): read_str.index("}") + 1]
                 uart_json = json.loads(read_str)
@@ -205,7 +202,7 @@ while True:
 
     uart_send_data_json = json.dumps(uart_send_data)
     print("uart send data", uart_send_data_json)
-    uart.write(uart_send_data_json)  # 数据回传
+    uart.write(uart_send_data_json)
     # print("uart send data",uart_send_data_json)
 
     # print(clock.fps())
