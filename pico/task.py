@@ -334,10 +334,20 @@ class Task:
         else:
             print("sign action is invalid")
 
-    def follow_obj_action(self, x, y, obj_dis):
-        print(f"obj_dis: {obj_dis}")
-        if obj_dis > self.rotate_in_front_of_obj + self.claw_open_len:
-            self.close_to_obj_action(x, y, claw_range_level=1.5)
+    def follow_obj_action(self, cx, cy, obj_dis):
+        if cy < self.k210_y_center - self.arm_range:
+            self.car.armUp(self.arm_up_speed)
+            sleep(0.3)
+        elif cy > self.k210_y_center + self.arm_range:
+            self.car.armDown(self.arm_down_speed)
+            sleep(0.3)
+        elif cx > self.k210_center - self.claw_range:
+            self.car.keepTurnRight(self.turn_right_speed)
+        elif cx < self.k210_center - self.claw_range:
+            self.car.keepTurnLeft(self.turn_left_speed)
+
+        self.car.keepForward(self.forward_speed)
+        sleep(0.1)
 
     def run(self, only_get_uart_data=False):
         # if not self.validate_target_action():

@@ -16,7 +16,7 @@ if __name__ == '__main__':
         # {"mode": "find_apriltags", "id": 1, "action": "grab-by-kpu-apriltags"},
         # {"mode": "find_apriltags", "id": 88, "action": "put-down"},
         # {"mode": "kpu", "id": "get_all_id", "action": "sign"},
-        {"mode": "kpu", "id": "left", "action": "follow_obj"},
+        {"mode": "kpu", "id": "stop", "action": "follow_obj"},
         {"mode": "find_blobs", "id": "", "action": "finished"},
     ]
     option_params = {
