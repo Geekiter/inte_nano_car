@@ -1,4 +1,5 @@
 import json
+import time
 from time import sleep
 
 
@@ -80,6 +81,7 @@ class Task:
             "left": self.car.keepTurnLeft(self.turn_left_speed),
             "right": self.car.keepTurnRight(self.turn_right_speed),
         }
+        self.follow_obj_timer = None
 
     def get_zf(self, target_id):
         if target_id in self.big_tag_id_list:
@@ -332,6 +334,11 @@ class Task:
         else:
             print("sign action is invalid")
 
+    def follow_obj_action(self, x, y, obj_dis):
+        print(f"obj_dis: {obj_dis}")
+        if obj_dis > self.rotate_in_front_of_obj + self.claw_open_len:
+            self.close_to_obj_action(x, y, claw_range_level=1.5)
+
     def run(self, only_get_uart_data=False):
         # if not self.validate_target_action():
         #     print("target action is invalid")
@@ -483,3 +490,12 @@ class Task:
                 self.kpu_locate_action(obj_x, obj_y, obj_dis)
             elif self.target_action_list[self.target_index] == "sign":
                 self.sign_action(obj_id)
+            elif self.target_action_list[self.target_index] == "follow_obj":
+                if self.follow_obj_timer is None:
+                    self.follow_obj_timer = time.time()
+                # after 5 minutes, target_index + 1
+                elif time.time() - self.follow_obj_timer > 5 * 60:
+                    self.next_target()
+                    self.follow_obj_timer = None
+                obj_dis = self.kpu_obj_zoom_factor * obj_z
+                self.follow_obj_action(obj_x, obj_y, obj_dis)
