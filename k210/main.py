@@ -20,6 +20,7 @@ sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.QQVGA)
 sensor.skip_frames(time=2000)
 sensor.set_vflip(1)
+sensor.set_hmirror(1)
 clock = time.clock()
 
 fm.register(6, fm.fpioa.UART1_RX, force=True)
@@ -35,10 +36,10 @@ c_x = 160 * 0.5
 c_y = 120 * 0.5
 
 # kpu
-anchors = [2.41, 2.62, 1.06, 1.12, 1.94, 2.0, 1.41, 1.53, 0.59, 0.75]
-# model_addr = "/sd/duck_in224.kmodel"
+anchors = [1.84, 2.19, 2.06, 1.78, 1.5, 1.53, 2.47, 2.44, 3.03, 3.19]
+# model_addr = "/sd/sign2k.kmodel"
 model_addr = 0x300000
-labels = ['left', 'right', 'park', 'stop', 'turning']
+labels = ['left', 'stop', 'right']
 # labels = ["red_box", "duck"]
 
 threshold_list = {

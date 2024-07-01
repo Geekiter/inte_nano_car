@@ -335,15 +335,15 @@ class Task:
             print("sign action is invalid")
 
     def follow_obj_action(self, cx, cy, obj_dis):
-        if cy < self.k210_y_center - self.arm_range:
+        if cy < self.k210_y_center:
             self.car.armUp(self.arm_up_speed)
             sleep(0.3)
-        elif cy > self.k210_y_center + self.arm_range:
+        elif cy > self.k210_y_center:
             self.car.armDown(self.arm_down_speed)
             sleep(0.3)
-        elif cx > self.k210_center - self.claw_range:
+        if cx > self.k210_center - self.claw_range / 2:
             self.car.keepTurnRight(self.turn_right_speed)
-        elif cx < self.k210_center - self.claw_range:
+        elif cx < self.k210_center - self.claw_range / 2:
             self.car.keepTurnLeft(self.turn_left_speed)
 
         self.car.keepForward(self.forward_speed)
