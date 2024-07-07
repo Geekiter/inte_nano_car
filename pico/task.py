@@ -72,10 +72,13 @@ class Task:
         self.wait_ct = kwargs.get('wait_ct', 0)
         self.wait_ct_limit = kwargs.get('wait_ct_limit', 10)
         self.count_in_sign = kwargs.get('count_in_sign', 10)
+        self.grab_center_x = kwargs.get('grab_center_x', 61)
+        self.grab_center_y = kwargs.get('grab_center_y', 80)
 
         self.is_finished = False
         self.search_count = 0
         self.discovered_obj = False
+        self.obj_status_none_count = 0
 
         self.signs_action = {
             "left": self.car.keepTurnLeft(self.turn_left_speed),
@@ -90,44 +93,107 @@ class Task:
             return self.small_tag_zoomfactor
 
     def close_to_obj_action(self, cx, cy, claw_range_level=1.5):
-        print(f"cx: {cx}, cy: {cy}")
-        print(f"k210_center: {self.k210_center}, k210_y_center: {self.k210_y_center}")
-        print("k210_y_center - arm_range: ", self.k210_y_center - self.arm_range)
-        print("k210_y_center + arm_range: ", self.k210_y_center + self.arm_range)
-        print(f"arm_range: {self.arm_range}")
-        if cy < self.k210_y_center - self.arm_range:
-            print("view is low, arm up")
-            self.car.armUp(self.arm_up_speed)
-            sleep(0.3)
-        elif cy > self.k210_y_center + self.arm_range:
-            print("view is high, arm down")
-            self.car.armDown(self.arm_down_speed)
-            sleep(0.3)
-        elif cx > self.k210_center + claw_range_level * self.claw_range:
-            print("right")
-            self.car.keepTurnRight(self.turn_right_speed)
-        # 如果cx小于k210_center - claw_range，说明物体在左边，左转
-        elif cx < self.k210_center - claw_range_level * self.claw_range:
-            print("left")
-            self.car.keepTurnLeft(self.turn_left_speed)
-        else:
-            print("forward")
+        t_left = 50
+        t_right = 70
+        t_bottom = 20
+        t_top = 50
+        if t_left < cx < t_right and t_bottom < cy < t_top:
             self.car.keepForward(self.forward_speed)
-            sleep(0.1)
+        # 方向控制
+        elif cx > t_right:
+            print("grab, right")
+            self.car.keepTurnRight(self.turn_right_speed)
+            self.car.keepForward(self.forward_speed)
+        elif cx < t_left:
+            print("grab, left")
+            self.car.keepTurnLeft(self.turn_left_speed)
+            self.car.keepForward(self.forward_speed)
+        # 高度控制
+        elif cy < t_bottom:
+            # up
+            print("grab, arm up")
+            self.car.armUp(self.arm_up_speed)
+            self.car.keepForward(self.forward_speed)
+        elif cy > t_top:
+            print("grab, arm down")
+            self.car.armDown(self.arm_down_speed)
+            self.car.keepForward(self.forward_speed)
+
+    def common_action_put_down(self, dis):
+        if dis <= 20:
+            print("put down !!!")
+            for _ in range(10):
+                self.car.openClaw()
+            self.put_down_transition()
+            self.next_target()
+        else:
+            self.car.keepForward(self.forward_speed)
+
+    def common_action_locate(self, dis):
+        if dis < 20:
+            for _ in range(10):
+                self.car.armDown(self.arm_down_speed)
+        else:
+            print("locate !!!")
+            self.car.keepForward(self.forward_speed)
+
+    def common_action_grab(self, dis):
+        if dis <= 14:
+            for _ in range(1):
+                self.car.keepBackward(self.backward_speed)
+            for _ in range(15):
+                self.car.closeClaw()
+            for _ in range(4):
+                self.car.armUp(self.arm_up_speed)
+
+            for _ in range(2 * (self.grab_forward_count - 1)):
+                self.car.keepBackward(self.backward_speed)
+
+            self.next_target()
+        else:
+            self.car.keepForward(self.forward_speed)
+
+    def common_action(self, cx, cy, dis, left=50, right=70, top=20, bottom=50, action="locate"):
+        print("common action, dis: ", dis)
+        if left < cx < right and top < cy < bottom:
+            if action == "locate":
+                print("common action: locate")
+                self.car.keepForward(self.forward_speed)
+            elif action == "put-down":
+                print("common action: put down")
+                self.common_action_put_down(dis)
+            elif action == "grab":
+                print("common action: grab by apriltags")
+                self.common_action_grab(dis)
+            else:
+                print("common action error: ", action)
+
+        # 方向控制
+        elif cx >= right:
+            print("grab, right")
+            self.car.keepTurnRight(self.turn_right_speed)
+            self.car.keepForward(self.forward_speed)
+
+        elif cx <= left:
+            print("grab, left")
+            self.car.keepTurnLeft(self.turn_left_speed)
+            self.car.keepForward(self.forward_speed)
+
+        # 高度控制
+        elif cy <= top:
+            # up
+            print("grab, arm up")
+            self.car.armUp(self.arm_up_speed)
+            self.car.keepForward(self.forward_speed)
+
+        elif cy >= bottom:
+            print("grab, arm down")
+            self.car.armDown(self.arm_down_speed)
+            self.car.keepForward(self.forward_speed)
 
     def get_locate_action(self, tag_x, tag_y, tag_z):
-        obj_dis = tag_z
-        print(f"tag_x: {tag_x}, tag_y: {tag_y}, tag_z: {tag_z}")
-        print(f"obj_dis: {obj_dis}")
-        if obj_dis > self.locate_stop_dis:
-            self.close_to_obj_action(tag_x, tag_y)
-        else:
-            for _ in range(16):
-                self.car.armDown(self.arm_down_speed)
-                sleep(0.1)
-
-            print("have located the object")
-            self.next_target()
+        self.common_action(tag_x, tag_y, tag_z, action="locate", left=self.grab_center_x - 5,
+                           right=self.grab_center_y + 5, top=self.grab_center_y - 40, bottom=self.grab_center_y - 30)
 
     def put_down_transition(self):
         for _ in range(10):
@@ -137,8 +203,8 @@ class Task:
             self.car.armDown(self.arm_down_speed)
             sleep(0.3)
 
-        for _ in range(4):
-            self.car.closeClaw()
+        # for _ in range(4):
+        #     self.car.closeClaw()
 
     def grab_transition(self):
         for _ in range(12):
@@ -146,21 +212,9 @@ class Task:
         for _ in range(4):
             self.car.keepBackward(self.backward_speed)
 
-    def put_down_action(self, tag_x, tag_y, tag_z):
-        print(f"distant is: {tag_z}")
-        if tag_z > self.claw_close_len + self.arm_up_len:
-            self.close_to_obj_action(tag_x, tag_y)
-        else:
-            for _ in range(3):
-                self.car.armUp(self.arm_up_speed)
-                sleep(0.3)
-
-            for _ in range(4):
-                self.car.openClaw()
-
-            self.put_down_transition()
-
-            self.next_target()
+    def put_down_action(self, cx, cy, dis):
+        self.common_action(cx, cy, dis, action="put-down", left=self.grab_center_x - 5, right=self.grab_center_y + 5,
+                           top=self.grab_center_y - 40, bottom=self.grab_center_y - 30)
 
     def kpu_locate_action(self, x, y, obj_dis):
         print(f"obj_dis: {obj_dis}")
@@ -187,22 +241,18 @@ class Task:
                 self.car.armUp(self.arm_up_speed)
 
     def grab_by_kpu(self, cx, cy, dis):
-        print(f"grab by kpu, distant is: {dis}")
-        if dis > (self.rotate_in_front_of_obj + self.claw_open_len):
-            self.close_to_obj_action(cx, cy, claw_range_level=1.5)
-        else:
-            # if cy < self.k210_y_center:
-            #     print("grab by kpu, arm up")
-            #     self.car.armUp(self.arm_up_speed)
-            # else:
-            #     self.grab_mode = True
-            self.grab_mode = True
-            if cy > self.claw_arm_up_len:
-                self.car.armUp(self.arm_up_speed)
-                sleep(0.5)
-                print("arm up, and h is: ", cy)
-            else:
-                self.car.keepForward(25)
+        self.common_action(cx, cy, dis,
+                           action="grab", left=self.grab_center_x - 5,
+                           right=self.grab_center_y + 5,
+                           top=self.grab_center_y,
+                           bottom=120 - 20)
+
+    def grab_by_apriltags(self, cx, cy, dis):
+        self.common_action(cx, cy, dis,
+                           action="grab", left=self.grab_center_x - 5,
+                           right=self.grab_center_y + 5,
+                           top=self.grab_center_y,
+                           bottom=120 - 20)
 
     def grab_mode_in_kpu(self):
         for _ in range(1):
@@ -244,17 +294,11 @@ class Task:
             self.car.armDown(self.arm_down_speed)
 
     def grab_by_color(self, cx, cy, dis):
-        print(f"distant is: {dis}")
-        if dis > (self.rotate_in_front_of_obj + self.claw_open_len) and not self.grab_mode:
-            self.close_to_obj_action(cx, cy, claw_range_level=1.5)
-        else:
-            self.grab_mode = True
-            if cy > self.claw_arm_up_len:
-                self.car.armUp(self.arm_up_speed)
-                sleep(0.5)
-                print("arm up, and h is: ", cy)
-            else:
-                self.car.keepForward(25)
+        self.common_action(cx, cy, dis,
+                           action="grab", left=self.grab_center_x - 5,
+                           right=self.grab_center_y + 5,
+                           top=self.grab_center_y,
+                           bottom=120 - 20)
 
     def discovered_obj_action(self):
         print("current search count: {}".format(self.search_count))
@@ -383,14 +427,21 @@ class Task:
             obj_w = 0
             obj_h = 0
             obj_z = 0
+            obj_id = 0
             # if self.target_action[self.target_index]["id"] != "":
             if self.target_img_mode[self.target_index] == "find_apriltags":
                 tag_id = int(data.get("TagId", "999"))
                 tag_status = data.get("TagStatus", "none")
+                if tag_status == "none":
+                    self.obj_status_none_count += 1
+                else:
+                    self.obj_status_none_count = 0
                 zoomfactor = self.get_zf(tag_id)
-                tag_z = int(zoomfactor * float(data.get("TagTz", "999")))
+                tag_z = zoomfactor * float(data.get("TagTz", "999"))
                 tag_cx = int(data.get("TagCx", "999"))
                 tag_cy = int(data.get("TagCy", "999"))
+                tag_w = int(data.get("TagWidth", "999"))
+                tag_h = int(data.get("TagHeight", "999"))
                 find_tag_id = data.get("find_tag_id", None)
                 print(f"find tag id: {find_tag_id}, target id: {self.target_id_list[self.target_index]}")
                 # if find_tag_id is None or find_tag_id != self.target_id_list[self.target_index]:
@@ -404,6 +455,10 @@ class Task:
                 obj_z = data.get("ObjectZ", 0)
                 obj_id = data.get("ObjectId", 0)
                 obj_status = data.get("ObjectStatus", "none")
+                if obj_status == "none":
+                    self.obj_status_none_count += 1
+                else:
+                    self.obj_status_none_count = 0
                 find_tag_id = data.get("find_tag_id", None)
                 print(f"find tag id: {find_tag_id}, target id: {self.target_id_list[self.target_index]}")
             if find_tag_id is None or find_tag_id != self.target_id_list[self.target_index]:
@@ -427,45 +482,22 @@ class Task:
 
             if self.target_action_list[self.target_index] == "finished":
                 self.is_finished = True
+                for _ in range(10):
+                    self.car.closeClaw()
                 break
-            elif self.grab_mode and obj_status != "get":
+            elif self.grab_mode and self.obj_status_none_count > 10:
                 print("grab mode, and obj status is: ", obj_status)
                 if self.target_action_list[self.target_index] in ["grab-by-kpu", "grab-by-kpu-apriltags"]:
                     self.grab_mode_in_kpu()
-                elif self.target_action_list[self.target_index] == "grab-by-color":
+                elif self.target_action_list[self.target_index] in ["grab-by-color", "grab-by-apriltags"]:
                     self.grab_mode_in_color()
 
                 # grab_transition()
 
                 self.grab_mode = False
-                self.grab_attempted = True
+                self.next_target()
                 obj_status = "none"
                 sleep(2)
-
-            elif self.grab_attempted:
-                print("grab attempted")
-                if data == {}:
-                    continue
-                print("all count:{}, get count:{}".format(self.grab_attempted_all_count, self.grab_attempted_get_count))
-                if obj_status == "get":
-                    self.grab_attempted_get_count += 1
-                    self.grab_attempted_all_count += 1
-                elif obj_status == "none":
-                    self.grab_attempted_all_count += 1
-                if self.grab_attempted_all_count > 10:
-                    if self.grab_attempted_get_count >= 3:
-                        self.grab_forward_count += 1
-                        self.grab_mode = False
-                        self.grab_attempted = False
-                        self.grab_attempted_get_count = 0
-                        self.grab_attempted_all_count = 0
-                        for _ in range(10):
-                            self.car.openClaw()
-                    else:
-                        self.grab_transition()
-                        self.grab_forward_count = self.grab_forward_count_origin
-                        self.grab_attempted = False
-                        self.next_target()
 
             elif (tag_status == "none" and obj_status == "none") or (
                     tag_status == "get" and tag_id != self.target_id_list[self.target_index]):
@@ -487,6 +519,8 @@ class Task:
             elif self.target_action_list[self.target_index] == "grab-by-kpu":
                 obj_dis = self.kpu_obj_zoom_factor * obj_z
                 self.grab_by_kpu(obj_x, obj_y, obj_dis)
+            elif self.target_action_list[self.target_index] == "grab-by-apriltags":
+                self.grab_by_apriltags(tag_cx, tag_cy, tag_z)
             elif self.target_action_list[self.target_index] == "grab-by-color":
                 obj_dis = self.color_obj_zoom_factor * obj_z
                 self.grab_by_color(obj_x, obj_y, obj_dis)

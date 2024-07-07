@@ -50,7 +50,7 @@ threshold_list = {
 }
 
 img_mode = "find_apriltags"
-img_mode = "kpu"
+# img_mode = "kpu"
 # img_mode = "find_blobs"
 task = None
 task = kpu.load(model_addr)
@@ -71,6 +71,8 @@ def calculate_distance_to_tag(tag_width_pixel):
 
 while True:
     print("stack mem", gc.mem_free() / 1024)  # stack mem
+    if gc.mem_free() < 200:
+        gc.collect()
     print("heap mem", Maix.utils.heap_free() / 1024)  # heap mem
     uart_send_data = {}
     clock.tick()
@@ -93,6 +95,7 @@ while True:
             gc.collect()
             img = None
             print("uart img_mode:", img_mode)
+        if "find_tag_id" in uart_json:
             find_tag_id = uart_json.get("find_tag_id", None)
 
     except Exception as e:
@@ -132,6 +135,8 @@ while True:
             uart_send_data["TagCx"] = tag.cx()
             uart_send_data["TagCy"] = tag.cy()
             uart_send_data["TagId"] = tag.id()
+            uart_send_data['TagWidth'] = tag.w()
+            uart_send_data['TagHeight'] = tag.h()
 
         apriltags = None
     elif img_mode == "find_blobs":

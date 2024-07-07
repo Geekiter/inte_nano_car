@@ -72,7 +72,7 @@ class Car:
         else:
             self.currentGrabLevel = max(self.currentGrabLevel - 10, self.minGrabLevel)
 
-        print(f"close Claw at {self.currentGrabLevel}")
+        print(f"open Claw at {self.currentGrabLevel}")
         self.RotateBCCW(self.currentGrabLevel)
         sleep(0.5)
         self.StopMotor()
@@ -86,7 +86,7 @@ class Car:
         else:
             self.currentGrabLevel = max(self.currentGrabLevel - 10, self.minGrabLevel)
 
-        print(f"open Claw at {self.currentGrabLevel}")
+        print(f"close Claw at {self.currentGrabLevel}")
 
         self.RotateBCW(self.currentGrabLevel)
         sleep(0.5)
