@@ -14,11 +14,10 @@ from machine import UART
 
 print(os.listdir("/"))
 
-lcd.init()
-sensor.reset(freq=20000000)
+lcd.init(freq=15000000)
+sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.QQVGA)
-sensor.skip_frames(time=2000)
 sensor.set_vflip(1)
 sensor.set_hmirror(1)
 clock = time.clock()
@@ -35,12 +34,14 @@ f_y = (2.8 / 2.952) * 120
 c_x = 160 * 0.5
 c_y = 120 * 0.5
 
-# kpu
-anchors = [1.84, 2.19, 2.06, 1.78, 1.5, 1.53, 2.47, 2.44, 3.03, 3.19]
+
 # model_addr = "/sd/sign2k.kmodel"
 model_addr = 0x300000
-labels = ['left', 'stop', 'right']
-# labels = ["red_box", "duck"]
+#labels = ['left', 'stop', 'right']
+# kpu
+#anchors = [1.84, 2.19, 2.06, 1.78, 1.5, 1.53, 2.47, 2.44, 3.03, 3.19]
+labels = ["red_box", "duck"]
+anchors = [2.41, 2.62, 1.06, 1.12, 1.94, 2.0, 1.41, 1.53, 0.59, 0.75]
 
 threshold_list = {
     "red": [(72, 20, 127, 41, 56, 6)],
@@ -50,7 +51,7 @@ threshold_list = {
 }
 
 img_mode = "find_apriltags"
-# img_mode = "kpu"
+img_mode = "kpu"
 # img_mode = "find_blobs"
 task = None
 task = kpu.load(model_addr)
@@ -71,7 +72,7 @@ def calculate_distance_to_tag(tag_width_pixel):
 
 while True:
     print("stack mem", gc.mem_free() / 1024)  # stack mem
-    if gc.mem_free() < 200:
+    if gc.mem_free()/1024 < 200:
         gc.collect()
     print("heap mem", Maix.utils.heap_free() / 1024)  # heap mem
     uart_send_data = {}

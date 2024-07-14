@@ -120,7 +120,7 @@ class Task:
             self.car.keepForward(self.forward_speed)
 
     def common_action_put_down(self, dis):
-        if dis <= 20:
+        if dis <= 18:
             print("put down !!!")
             for _ in range(10):
                 self.car.openClaw()
@@ -130,7 +130,7 @@ class Task:
             self.car.keepForward(self.forward_speed)
 
     def common_action_locate(self, dis):
-        if dis < 20:
+        if dis < 15:
             for _ in range(10):
                 self.car.armDown(self.arm_down_speed)
         else:
@@ -138,7 +138,7 @@ class Task:
             self.car.keepForward(self.forward_speed)
 
     def common_action_grab(self, dis):
-        if dis <= 14:
+        if dis <= 13:
             for _ in range(1):
                 self.car.keepBackward(self.backward_speed)
             for _ in range(15):
@@ -169,27 +169,28 @@ class Task:
                 print("common action error: ", action)
 
         # 方向控制
-        elif cx >= right:
-            print("grab, right")
-            self.car.keepTurnRight(self.turn_right_speed)
-            self.car.keepForward(self.forward_speed)
+        else:
+            # 高度控制
+            if cy <= top:
+                # up
+                print("grab, arm up")
+                self.car.armUp(self.arm_up_speed)
 
-        elif cx <= left:
-            print("grab, left")
-            self.car.keepTurnLeft(self.turn_left_speed)
-            self.car.keepForward(self.forward_speed)
+            elif cy >= bottom:
+                print("grab, arm down")
+                self.car.armDown(self.arm_down_speed)
 
-        # 高度控制
-        elif cy <= top:
-            # up
-            print("grab, arm up")
-            self.car.armUp(self.arm_up_speed)
-            self.car.keepForward(self.forward_speed)
+            if cx >= right:
+                print("grab, right")
+                self.car.keepTurnRight(self.turn_right_speed)
+                self.car.keepForward(self.forward_speed)
 
-        elif cy >= bottom:
-            print("grab, arm down")
-            self.car.armDown(self.arm_down_speed)
-            self.car.keepForward(self.forward_speed)
+            elif cx <= left:
+                print("grab, left")
+                self.car.keepTurnLeft(self.turn_left_speed)
+                self.car.keepForward(self.forward_speed)
+
+
 
     def get_locate_action(self, tag_x, tag_y, tag_z):
         self.common_action(tag_x, tag_y, tag_z, action="locate", left=self.grab_center_x - 5,
