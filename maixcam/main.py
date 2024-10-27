@@ -15,8 +15,17 @@ all_img_mode = ['kpu', 'find_apriltags', 'find_blobs']
 # 初始化：外设
 ts = touchscreen.TouchScreen()
 
-cam = camera.Camera(width=512, height=320, fps=60)
+width = 480
+height = 280
+k210_width =160
+k210_height = 120
+cam = camera.Camera(width=width, height=height, fps=60)
+width_weight = k210_width / width
+height_weight = k210_height / height
+
 cam.skip_frames(30)  # 跳过开头的30帧,图像采集还没稳定出现奇怪的画面
+cam.vflip(True)  # 垂直翻转
+cam.hmirror(True)  # 水平翻转
 disp = display.Display()
 ports = uart.list_devices()  # 列出当前可用的串口
 print('uart support ports:', ports)
@@ -26,7 +35,7 @@ serial = uart.UART(device, 115200)
 
 
 def on_uart_received(serial: uart.UART, data: bytes):
-    global img_mode, find_tag_id, img
+    global img_mode, find_tag_id
     uart_json = {}
     read_str = data.decode("utf-8")
     if "{" in read_str and "}" in read_str:
@@ -38,7 +47,7 @@ def on_uart_received(serial: uart.UART, data: bytes):
         img_mode = uart_json["img_mode"]
         if img_mode not in all_img_mode:
             img_mode = all_img_mode[0]
-        img = None
+
         print("uart img_mode:", img_mode)
     if "find_tag_id" in uart_json:
         find_tag_id = uart_json.get("find_tag_id", None)
@@ -69,6 +78,8 @@ while 1:
     if is_in_button(x, y, exit_btn_pos):
         app.set_exit_flag(True)
     # apriltag
+    uart_send_data["find_tag_id"] = find_tag_id
+    uart_send_data['img_mode'] = img_mode
     if img_mode == 'find_apriltags':
         apriltags = img.find_apriltags(families=families)
         for a in apriltags:
@@ -80,13 +91,13 @@ while 1:
                               image.COLOR_GREEN, 2)
             img.draw_string(a.x(), a.y(), "id: " + str(a.id()), color=image.COLOR_RED)
 
-            uart_send_data['TagStatus'] = 'none'
+            uart_send_data['TagStatus'] = 'get'
             uart_send_data['TagId'] = a.id()
-            uart_send_data['TagCX'] = a.x_translation() + a.w() / 2
-            uart_send_data['TagCY'] = a.y_translation() + a.h() / 2
-            uart_send_data['TagTz'] = a.z_translation()
-            uart_send_data['TagWidth'] = a.w()
-            uart_send_data['TagHeight'] = a.h()
+            uart_send_data['TagCx'] = (a.x() + a.w() / 2) * width_weight
+            uart_send_data['TagCy'] = (a.y() + a.h() / 2) * height_weight
+            uart_send_data['TagTz'] = - a.z_translation()
+            uart_send_data['TagWidth'] = a.w() * width_weight
+            uart_send_data['TagHeight'] = a.h() * height_weight
 
     elif img_mode == 'kpu':
         # TODO duck
@@ -96,11 +107,12 @@ while 1:
             msg = f'{detector.labels[obj.class_id]}: {obj.score:.2f}'
             img.draw_string(obj.x, obj.y, msg, color=image.COLOR_RED)
             uart_send_data['ObjectId'] = detector.labels[obj.class_id]
-            uart_send_data['ObjectX'] = obj.x + obj.w / 2
-            uart_send_data['ObjectY'] = obj.y + obj.h / 2
-            uart_send_data['ObjectWidth'] = obj.w
-            uart_send_data['ObjectHeight'] = obj.h
-            uart_send_data['ObjectZ'] = obj.w * obj.w + obj.h * obj.h
+            uart_send_data['ObjectX'] = (obj.x + obj.w / 2) * width_weight
+            uart_send_data['ObjectY'] = (obj.y + obj.h / 2) * height_weight
+            uart_send_data['ObjectWidth'] = obj.w * width_weight
+            uart_send_data['ObjectHeight'] = obj.h * height_weight
+            uart_send_data['ObjectZ'] = 1 / obj.w * width_weight
+            uart_send_data['ObjectStatus'] = 'get'
     uart_send_data_json = json.dumps(uart_send_data)
     print("uart send data: ", uart_send_data_json)
     serial.write_str(uart_send_data_json)

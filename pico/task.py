@@ -155,6 +155,8 @@ class Task:
 
     def common_action(self, cx, cy, dis, left=50, right=70, top=20, bottom=50, action="locate"):
         print("common action, dis: ", dis)
+        print("left: ", left, "right: ", right, "top: ", top, "bottom: ", bottom)
+        print("cx: ", cx, "cy: ", cy)
         if left < cx < right and top < cy < bottom:
             if action == "locate":
                 print("common action: locate")
@@ -194,7 +196,7 @@ class Task:
 
     def get_locate_action(self, tag_x, tag_y, tag_z):
         self.common_action(tag_x, tag_y, tag_z, action="locate", left=self.grab_center_x - 5,
-                           right=self.grab_center_y + 5, top=self.grab_center_y - 40, bottom=self.grab_center_y - 30)
+                           right=self.grab_center_x + 5, top=self.grab_center_y - 40, bottom=self.grab_center_y - 30)
 
     def put_down_transition(self):
         for _ in range(10):
@@ -214,8 +216,8 @@ class Task:
             self.car.keepBackward(self.backward_speed)
 
     def put_down_action(self, cx, cy, dis):
-        self.common_action(cx, cy, dis, action="put-down", left=self.grab_center_x - 5, right=self.grab_center_y + 5,
-                           top=self.grab_center_y - 40, bottom=self.grab_center_y - 30)
+        self.common_action(cx, cy, dis, action="put-down", left=self.grab_center_x - 5, right=self.grab_center_x + 5,
+                           top=self.grab_center_y, bottom=self.grab_center_y)
 
     def kpu_locate_action(self, x, y, obj_dis):
         print(f"obj_dis: {obj_dis}")
@@ -244,16 +246,16 @@ class Task:
     def grab_by_kpu(self, cx, cy, dis):
         self.common_action(cx, cy, dis,
                            action="grab", left=self.grab_center_x - 5,
-                           right=self.grab_center_y + 5,
+                           right=self.grab_center_x + 5,
                            top=self.grab_center_y,
-                           bottom=120 - 20)
+                           bottom=self.grab_center_y + 10)
 
     def grab_by_apriltags(self, cx, cy, dis):
         self.common_action(cx, cy, dis,
                            action="grab", left=self.grab_center_x - 5,
-                           right=self.grab_center_y + 5,
+                           right=self.grab_center_x + 5,
                            top=self.grab_center_y,
-                           bottom=120 - 20)
+                           bottom=self.grab_center_y + 10)
 
     def grab_mode_in_kpu(self):
         for _ in range(1):
@@ -288,7 +290,7 @@ class Task:
         for _ in range(12):
             self.car.armUp(self.arm_up_speed)
 
-        for _ in range(2 * (self.grab_forward_count)):
+        for _ in range(2 * self.grab_forward_count):
             self.car.keepBackward(self.backward_speed)
 
         for _ in range(14):
@@ -297,7 +299,7 @@ class Task:
     def grab_by_color(self, cx, cy, dis):
         self.common_action(cx, cy, dis,
                            action="grab", left=self.grab_center_x - 5,
-                           right=self.grab_center_y + 5,
+                           right=self.grab_center_x + 5,
                            top=self.grab_center_y,
                            bottom=120 - 20)
 
@@ -333,6 +335,7 @@ class Task:
             self.car.openClaw()
 
     def get_json(self, uart_data):
+        global uart_read
         try:
             uart_read = uart_data.read()
             uart_data = uart_read.decode("utf-8")
