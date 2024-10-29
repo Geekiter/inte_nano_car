@@ -1,7 +1,7 @@
 # 画面
 import json
 
-from maix import camera, display, image, nn, uart, touchscreen, app
+from maix import camera, display, image, nn, uart, touchscreen, app, time
 
 # 常量
 families = image.ApriltagFamilies.TAG36H11
@@ -19,13 +19,13 @@ width = 480
 height = 280
 k210_width =160
 k210_height = 120
-cam = camera.Camera(width=width, height=height, fps=60)
+cam = camera.Camera(width=width, height=height, fps=30)
 width_weight = k210_width / width
 height_weight = k210_height / height
 
 cam.skip_frames(30)  # 跳过开头的30帧,图像采集还没稳定出现奇怪的画面
-cam.vflip(True)  # 垂直翻转
-cam.hmirror(True)  # 水平翻转
+# cam.vflip(True)  # 垂直翻转
+# cam.hmirror(True)  # 水平翻转
 disp = display.Display()
 ports = uart.list_devices()  # 列出当前可用的串口
 print('uart support ports:', ports)
@@ -67,8 +67,10 @@ def is_in_button(x_t, y_t, btn_pos):
 while 1:
     # TODO 内存管理
     uart_send_data = {}
+    fps = time.fps()
     # 摄像头画面读取
     img = cam.read()
+
     img = img.lens_corr(strength=1.5)  # 调整strength的值直到画面不再畸变
     img.draw_string(8, 12, exit_label, image.COLOR_WHITE)
     img.draw_rect(exit_btn_pos[0], exit_btn_pos[1], exit_btn_pos[2], exit_btn_pos[3], image.COLOR_WHITE, 2)
@@ -116,4 +118,5 @@ while 1:
     uart_send_data_json = json.dumps(uart_send_data)
     print("uart send data: ", uart_send_data_json)
     serial.write_str(uart_send_data_json)
+    print("fps:", fps)
     disp.show(img)

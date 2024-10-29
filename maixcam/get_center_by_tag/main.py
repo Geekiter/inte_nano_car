@@ -23,8 +23,8 @@ width_weight = k210_width / width
 height_weight = k210_height / height
 
 cam.skip_frames(30)  # 跳过开头的30帧,图像采集还没稳定出现奇怪的画面
-cam.vflip(True)  # 垂直翻转
-cam.hmirror(True)  # 水平翻转
+# cam.vflip(True)  # 垂直翻转
+# cam.hmirror(True)  # 水平翻转
 
 disp = display.Display()
 

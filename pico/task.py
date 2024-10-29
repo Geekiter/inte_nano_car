@@ -120,7 +120,7 @@ class Task:
             self.car.keepForward(self.forward_speed)
 
     def common_action_put_down(self, dis):
-        if dis <= 18:
+        if dis <= 14:
             print("put down !!!")
             for _ in range(10):
                 self.car.openClaw()
@@ -139,14 +139,22 @@ class Task:
 
     def common_action_grab(self, dis):
         if dis <= 13:
-            for _ in range(1):
+            for _ in range(2):
                 self.car.keepBackward(self.backward_speed)
+
+            for _ in range(self.grab_arm_up_count):
+                self.car.armUp(self.arm_up_speed)
+
+            for _ in range(self.grab_forward_count):
+                self.car.keepForward(self.forward_speed)
+
+
             for _ in range(15):
                 self.car.closeClaw()
             for _ in range(4):
                 self.car.armUp(self.arm_up_speed)
 
-            for _ in range(2 * (self.grab_forward_count - 1)):
+            for _ in range(3 * (self.grab_forward_count - 1)):
                 self.car.keepBackward(self.backward_speed)
 
             self.next_target()
@@ -154,6 +162,17 @@ class Task:
             self.car.keepForward(self.forward_speed)
 
     def common_action(self, cx, cy, dis, left=50, right=70, top=20, bottom=50, action="locate"):
+
+        if 18 < dis < 25:
+            top = top - 4
+            bottom = bottom - 4
+        elif 16 < dis < 18:
+            top = top - 8
+            bottom = bottom - 8
+        elif dis < 16:
+            top = top - 15
+            bottom = bottom - 15
+
         print("common action, dis: ", dis)
         print("left: ", left, "right: ", right, "top: ", top, "bottom: ", bottom)
         print("cx: ", cx, "cy: ", cy)
@@ -185,14 +204,12 @@ class Task:
             if cx >= right:
                 print("grab, right")
                 self.car.keepTurnRight(self.turn_right_speed)
-                self.car.keepForward(self.forward_speed)
+                # self.car.keepForward(self.forward_speed)
 
             elif cx <= left:
                 print("grab, left")
                 self.car.keepTurnLeft(self.turn_left_speed)
-                self.car.keepForward(self.forward_speed)
-
-
+                # self.car.keepForward(self.forward_speed)
 
     def get_locate_action(self, tag_x, tag_y, tag_z):
         self.common_action(tag_x, tag_y, tag_z, action="locate", left=self.grab_center_x - 5,
@@ -216,8 +233,8 @@ class Task:
             self.car.keepBackward(self.backward_speed)
 
     def put_down_action(self, cx, cy, dis):
-        self.common_action(cx, cy, dis, action="put-down", left=self.grab_center_x - 5, right=self.grab_center_x + 5,
-                           top=self.grab_center_y, bottom=self.grab_center_y)
+        self.common_action(cx, cy, dis, action="put-down", left=self.grab_center_x - 10, right=self.grab_center_x + 10,
+                           top=self.grab_center_y - 40, bottom=self.grab_center_y - 20)
 
     def kpu_locate_action(self, x, y, obj_dis):
         print(f"obj_dis: {obj_dis}")
@@ -245,16 +262,16 @@ class Task:
 
     def grab_by_kpu(self, cx, cy, dis):
         self.common_action(cx, cy, dis,
-                           action="grab", left=self.grab_center_x - 5,
-                           right=self.grab_center_x + 5,
-                           top=self.grab_center_y,
+                           action="grab", left=self.grab_center_x - 10,
+                           right=self.grab_center_x + 10,
+                           top=self.grab_center_y - 10,
                            bottom=self.grab_center_y + 10)
 
     def grab_by_apriltags(self, cx, cy, dis):
         self.common_action(cx, cy, dis,
-                           action="grab", left=self.grab_center_x - 5,
-                           right=self.grab_center_x + 5,
-                           top=self.grab_center_y,
+                           action="grab", left=self.grab_center_x - 10,
+                           right=self.grab_center_x + 10,
+                           top=self.grab_center_y - 10,
                            bottom=self.grab_center_y + 10)
 
     def grab_mode_in_kpu(self):

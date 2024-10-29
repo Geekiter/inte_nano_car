@@ -3,17 +3,16 @@ from task import Task
 
 if __name__ == '__main__':
     target_action = [
+        # {"mode": "find_blobs", "id": "red", "action": "grab-by-color"},
+        # {"mode": "find_apriltags", "id": 86, "action": "grab-by-apriltags"},
+        # {"mode": "find_blobs", "id": "red", "action": "grab-by-color"},
+        # {"mode": "find_apriltags", "id": 11, "action": "put-down"},
+        {"mode": "kpu", "id": "duck", "action": "grab-by-kpu"},
+        # {"mode": "find_apriltags", "id": 94, "action": "put-down"},
+        {"mode": "find_apriltags", "id": 11, "action": "put-down"},
         {"mode": "find_apriltags", "id": 86, "action": "grab-by-apriltags"},
-        {"mode": "find_apriltags", "id": 94, "action": "put-down"},
-        {"mode": "find_apriltags", "id": 86, "action": "grab-by-apriltags"},
-        {"mode": "find_apriltags", "id": 94, "action": "put-down"},
-        {"mode": "find_apriltags", "id": 86, "action": "grab-by-apriltags"},
-        {"mode": "find_apriltags", "id": 94, "action": "put-down"},
-        {"mode": "find_apriltags", "id": 86, "action": "grab-by-apriltags"},
-        {"mode": "find_apriltags", "id": 94, "action": "put-down"},
-        {"mode": "find_apriltags", "id": 86, "action": "grab-by-apriltags"},
-        {"mode": "find_apriltags", "id": 94, "action": "put-down"},
-        {"mode": "find_blobs", "id": "", "action": "finished"},
+        {"mode": "find_apriltags", "id": 11, "action": "put-down"},
+        {"mode": "find_apriltags", "id": "", "action": "finished"},
     ]
     option_params = {
         "wifi_ssid": "WOW10086",
@@ -21,11 +20,11 @@ if __name__ == '__main__':
         "mqtt_server": "192.168.31.92",
         "big_tag_id_list": [18, 20],
         "small_tag_id_list": [86, 88, 94],
-        "small_tag_zoomfactor": 1.35,
+        "small_tag_zoomfactor": 2.04,
         "big_tag_zoomfactor": 11.8,
         "kpu_tag_zf": 0.19,
-        "kpu_obj_zoom_factor": 8.5,
-        "color_obj_zoom_factor": 4.5,
+        "kpu_obj_zoom_factor": 6210,
+        "color_obj_zoom_factor": 3696,
 
         # "duck_height_zoom_factor": 829.6,
         # "claw_open_len": 13.5,  # cm
@@ -38,7 +37,7 @@ if __name__ == '__main__':
         # "arm_range": 30,  # pixel range
         # "rotate_in_front_of_obj": 5.5,  # cm allow rotate in front of obj
         # "locate_stop_dis": 48,  # cm
-        "arm_up_speed": 40,
+        "arm_up_speed": 30,
         "arm_down_speed": 20,
         # "claw_grab_len": 11,
         "claw_arm_up_len": 30,  # when arm up, the height of claw
@@ -48,17 +47,17 @@ if __name__ == '__main__':
         # "grab_attempted_all_count": 0,
         # "put_down_obj": False,
         # "arm_up_len": 2,
-        "grab_arm_up_count": 0,
+        "grab_arm_up_count": 4,
         "grab_forward_count": 4,
         "grab_forward_count_origin": 4,
         # "wait_ct": 0,
         # "wait_ct_limit": 10,
-        "forward_speed": 60,
+        "forward_speed": 40,
         "count_in_sign": 10,
-        "turn_right_speed": 50,
-        "turn_left_speed": 50,
-        "grab_center_x": 61,
-        "grab_center_y": 84,
+        "turn_right_speed": 45,
+        "turn_left_speed": 45,
+        "grab_center_x": 80,
+        "grab_center_y": 90,
 
     }
 

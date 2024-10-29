@@ -3,8 +3,8 @@
 from maix import camera, display, image, nn, uart, touchscreen
 
 mode = 'dis'
-real_dis = 11  # cm, small
-zf = 1.82
+real_dis = 17  # cm, small
+zf = 2.04
 
 # 常量
 families = image.ApriltagFamilies.TAG36H11
@@ -26,8 +26,8 @@ width_weight = k210_width / width
 height_weight = k210_height / height
 
 cam.skip_frames(30)  # 跳过开头的30帧,图像采集还没稳定出现奇怪的画面
-cam.vflip(True)  # 垂直翻转
-cam.hmirror(True)  # 水平翻转
+# cam.vflip(True)  # 垂直翻转
+# cam.hmirror(True)  # 水平翻转
 disp = display.Display()
 ports = uart.list_devices()  # 列出当前可用的串口
 print('uart support ports:', ports)
